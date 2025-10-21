@@ -1,0 +1,81 @@
+/* src/components/BottomAd/BottomAd.css */
+.bottom-ad-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 95%;
+  max-width: 800px;
+  z-index: 1000;
+}
+
+.bottom-ad-container {
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa; /* Match Ad.css */
+  border-top: 1px solid #e9ecef; /* Match Ad.css */
+  border-radius: 8px 8px 0 0;
+  text-align: center;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05); /* Match Ad.css */
+  height: 60px !important; /* Fixed small height */
+  overflow: hidden !important; /* Clip any excess white space */
+  position: relative;
+}
+
+.bottom-ad-container ins.adsbygoogle {
+  display: block !important;
+  width: 100% !important;
+  height: 80px !important; /* Enforce small height */
+  max-height: 80px !important; /* Prevent AdSense from expanding */
+  overflow: hidden !important; /* Ensure no overflow */
+}
+
+.bottom-ad-close {
+  position: absolute;
+  top: -18px; /* Above ad to avoid click capture */
+  right: 4px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #6c757d;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002; /* Above ad iframe */
+  transition: background 0.2s;
+}
+
+.bottom-ad-close:hover {
+  background: #e9ecef;
+}
+
+.bottom-ad-wrapper.hidden .bottom-ad-container {
+  transform: translateY(100%);
+  opacity: 0;
+}
+
+.bottom-ad-wrapper.visible .bottom-ad-container {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .bottom-ad-container {
+    height: 50px !important;
+  }
+  .bottom-ad-container ins.adsbygoogle {
+    height: 50px !important;
+    max-height: 50px !important;
+  }
+  .bottom-ad-close {
+    top: -16px;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+}

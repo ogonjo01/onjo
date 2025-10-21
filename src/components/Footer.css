@@ -1,0 +1,218 @@
+/* Keyframes for animations */
+@keyframes glow {
+  0% {
+    text-shadow: 0 0 5px #38a169;
+  }
+  50% {
+    text-shadow: 0 0 20px #48bb78, 0 0 30px #68d391;
+  }
+  100% {
+    text-shadow: 0 0 5px #38a169;
+  }
+}
+
+@keyframes fill-up {
+  0% {
+    transform: scaleY(0);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Base Footer Styles */
+.ogonjo-footer {
+  background-color: #0d1a26; /* Deep dark blue-green for contrast */
+  color: #a0aec0; /* Light gray text */
+  border-top: 2px solid #2f855a; /* A strong green border */
+  margin-top: auto;
+  font-family: 'Roboto', sans-serif;
+}
+
+.ogonjo-footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.ogonjo-footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 3rem;
+}
+
+.ogonjo-footer-brand h1 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+  color: #68d391; /* Bright green for brand name */
+  animation: glow 3s infinite;
+}
+
+.ogonjo-footer-link-group h3,
+.ogonjo-footer-subscribe h3,
+.ogonjo-footer-social h3 {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  color: #38a169; /* Darker green for headers */
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Advanced Link & Hover Effects */
+.ogonjo-footer-link {
+  display: block;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.25rem;
+  color: #a0aec0;
+  transition: color 0.3s ease-in-out, transform 0.3s ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.ogonjo-footer-link::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #48bb78;
+  transform: scaleX(0);
+  transform-origin: bottom left;
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.ogonjo-footer-link:hover {
+  color: #68d391; /* Bright green on hover */
+  transform: translateX(5px);
+}
+
+.ogonjo-footer-link:hover::before {
+  transform: scaleX(1);
+}
+
+/* Subscription Box Styles */
+.ogonjo-footer-subscribe p {
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.ogonjo-subscribe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ogonjo-subscribe-input {
+  background-color: #1a202c; /* Darker background for input */
+  border: 1px solid #4a5568;
+  color: #a0aec0;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.ogonjo-subscribe-input:focus {
+  outline: none;
+  border-color: #38a169;
+  box-shadow: 0 0 0 3px rgba(56, 161, 105, 0.5); /* Green glow effect */
+}
+
+.ogonjo-subscribe-button {
+  background-color: #38a169;
+  color: #0d1a26;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.ogonjo-subscribe-button:hover:not(:disabled) {
+  background-color: #48bb78;
+  transform: translateY(-2px);
+}
+
+.ogonjo-subscribe-button:disabled {
+  background-color: #4a5568;
+  cursor: not-allowed;
+}
+
+.ogonjo-subscribe-message {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+/* Social Icons with Gamified Hover */
+.ogonjo-social-icon {
+  color: #a0aec0;
+  transition: color 0.3s ease-in-out, transform 0.3s ease-in-out;
+  position: relative;
+}
+
+.ogonjo-social-icon:hover {
+  color: #68d391;
+  transform: translateY(-5px) scale(1.1); /* Lift and scale effect */
+}
+
+/* Adjustments for the social icons and their labels */
+.ogonjo-social-links {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ogonjo-social-icon-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px; /* Space between icon and text */
+  color: #a0aec0;
+  font-size: 0.875rem;
+  transition: color 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.ogonjo-social-icon-link:hover {
+  color: #68d391;
+  transform: translateX(5px);
+}
+
+.ogonjo-social-icon-link svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease-in-out;
+}
+
+.ogonjo-social-icon-link:hover svg {
+  transform: scale(1.1); /* Slight grow on hover */
+}
+
+/* Copyright & Separator */
+.ogonjo-footer-separator {
+  border-top: 1px solid #2f855a;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  text-align: center;
+}
+
+.ogonjo-footer-copyright {
+  font-size: 0.875rem;
+  color: #4a5568; /* A darker gray for subtlety */
+}

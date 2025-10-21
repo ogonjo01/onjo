@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  functions = "netlify/functions"
+  publish = "dist"
+
+[dev]
+  functions = "netlify/functions"
+  command = "npm run dev"
+  port = 8081         # Netlify proxy
+  targetPort = 8082   # Actual Vite server (based on your logs)

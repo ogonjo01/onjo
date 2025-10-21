@@ -1,0 +1,128 @@
+/* src/pages/Features.css */
+
+/* CSS Variables for better maintenance */
+:root {
+  --header-height: 70px; /* Adjust this value if the header height changes */
+}
+
+/* --- General page layout --- */
+.features-page-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f8f8; /* Light gray background */
+  font-family: 'Roboto', sans-serif;
+  color: #34495e; /* Dark blue-gray for text */
+}
+
+/* Updated main content to prevent header overlap */
+.main-content {
+  flex: 1;
+  padding: 4rem 1.5rem;
+  padding-top: var(--header-height); /* Add top padding to clear the fixed header */
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* --- Hero Section --- */
+.hero-section {
+  text-align: center;
+  margin-bottom: 4rem;
+  padding: 2rem 0;
+}
+
+.hero-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2c3e50; /* Dark blue */
+  margin-bottom: 1rem;
+}
+
+.hero-description {
+  font-family: 'Roboto', sans-serif;
+  font-size: 1.15rem;
+  color: #7f8c8d; /* Muted gray */
+  max-width: 650px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* --- Features Grid --- */
+.features-grid-section {
+  padding: 2rem 0;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.feature-card {
+  background-color: #ffffff; /* White background */
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.feature-icon {
+  font-size: 2.5rem;
+  color: #3498db; /* A bright, professional blue */
+  margin-bottom: 1rem;
+}
+
+.feature-icon svg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.feature-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #34495e; /* Darker blue */
+  margin-bottom: 0.75rem;
+}
+
+.feature-description {
+  font-family: 'Roboto', sans-serif;
+  font-size: 1rem;
+  color: #7f8c8d; /* Muted gray */
+  line-height: 1.6;
+}
+
+/* --- Responsive adjustments --- */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 2rem 1rem;
+    padding-top: var(--header-height); /* Ensure padding remains on mobile */
+  }
+  
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-description {
+    font-size: 1rem;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-card {
+    padding: 1.5rem;
+  }
+}

@@ -1,0 +1,186 @@
+/* src/components/SubscriptionPopup/SubscriptionPopup.css */
+:root {
+  --header-height: 56px; /* unify to 56px */
+  --category-height: 48px;
+}
+
+.sp-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start; /* Changed to align from top */
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  /* Add top padding to account for header and category */
+  padding-top: calc(var(--header-height) + var(--category-height) + 16px);
+}
+
+.sp-popup {
+  background: white;
+  border-radius: 16px;
+  max-width: 480px;
+  width: 90%; /* Adjusted for better small-screen fit */
+  padding: 32px;
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  /* Ensure it doesn't exceed viewport height */
+  max-height: calc(100vh - var(--header-height) - var(--category-height) - 32px);
+  overflow-y: auto; /* Enable scrolling if content overflows */
+}
+
+.sp-popup-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  font-size: 20px;
+  transition: color 0.2s;
+}
+
+.sp-popup-close:hover {
+  color: #000;
+}
+
+.sp-popup-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.sp-popup-sub {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.sp-popup-benefits {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 24px;
+}
+
+.sp-popup-benefits li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.sp-popup-benefits li svg {
+  color: #4CAF50;
+  flex-shrink: 0;
+}
+
+.sp-popup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sp-popup-input-group {
+  position: relative;
+}
+
+.sp-popup-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+}
+
+.sp-popup-input {
+  width: 100%;
+  padding: 12px 12px 12px 36px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border 0.2s;
+}
+
+.sp-popup-input:focus {
+  border-color: #4CAF50;
+  outline: none;
+}
+
+.sp-popup-submit {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-popup-submit:hover {
+  background: #45a049;
+}
+
+.sp-popup-submit:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.sp-popup-error {
+  color: #e74c3c;
+  font-size: 14px;
+  text-align: center;
+}
+
+.sp-popup-success {
+  color: #4CAF50;
+  font-size: 14px;
+  text-align: center;
+}
+
+.sp-popup-testimonial {
+  margin-top: 16px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+  position: relative;
+}
+
+.sp-popup-star {
+  color: #f1c40f;
+  margin-right: 4px;
+}
+
+.sp-popup-legal {
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+  margin-top: 12px;
+}
+
+@media (max-width: 480px) {
+  .sp-popup {
+    padding: 24px;
+    width: 90%; /* Ensure it scales down well */
+    max-height: calc(100vh - var(--header-height) - var(--category-height) - 24px); /* Adjusted for padding */
+  }
+  .sp-popup-title {
+    font-size: 20px;
+  }
+  .sp-popup-sub {
+    font-size: 14px;
+  }
+  .sp-popup-benefits li {
+    font-size: 13px;
+  }
+  .sp-popup-input, .sp-popup-submit {
+    font-size: 15px;
+  }
+}

@@ -1,0 +1,177 @@
+:root {
+  --card-width: 220px;
+  --card-min-width: 160px;
+  --card-cover-height: 140px;
+  --card-border-radius: 12px;
+  --card-padding: 14px;
+}
+
+/* wrapper link */
+.card-link { 
+  text-decoration: none; 
+  color: inherit; 
+  display: inline-block;
+  width: 100%;
+}
+
+/* card */
+.summary-card {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: var(--card-border-radius);
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(6, 8, 10, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.12s ease;
+}
+
+.summary-card:hover { 
+  transform: translateY(-6px); 
+  box-shadow: 0 12px 32px rgba(6, 8, 10, 0.08); 
+}
+
+.cover-wrap {
+  width: 100%;
+  height: var(--card-cover-height);
+  flex: 0 0 auto;
+  background: linear-gradient(180deg, #f4f6f8, #eef2f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.book-cover-image { 
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover; 
+  display: block; 
+}
+
+.cover-placeholder {
+  width: 100%;
+  height: var(--card-cover-height);
+  background: linear-gradient(180deg, #697c8e, #76a798);
+}
+
+/* content */
+.card-content { 
+  padding: var(--card-padding); 
+  display: flex; 
+  flex-direction: column; 
+  flex-grow: 1;
+  gap: 8px; 
+}
+
+.book-title { 
+  margin: 0; 
+  font-size: 1rem; 
+  font-weight: 800; 
+  color: #08ae5e; 
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+
+.book-author { 
+  margin: 0; 
+  font-size: 0.82rem; 
+  color: #000000; 
+  font-weight: 600; 
+}
+
+.summary-text { 
+  margin: 0; 
+  color: #149336; 
+  font-size: 0.85rem; 
+  line-height: 1.4; 
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  flex-grow: 1;
+}
+
+/* footer */
+.card-footer { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  padding-top: 10px;
+  margin-top: auto;
+  gap: 4px;
+}
+
+.engagement-item { 
+  display: flex; 
+  align-items: center; 
+  gap: 4px; 
+  font-weight: 700; 
+  font-size: 0.85rem; 
+  color: #374151; 
+  white-space: nowrap;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.footer-icon { 
+  font-size: 0.92rem; 
+  opacity: 0.9; 
+  flex-shrink: 0;
+}
+
+.star-icon {
+  color: #fbbf24;
+  width: 16px;
+}
+
+.eng-count { 
+  display: inline-block; 
+  text-align: center;
+  min-width: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rating {
+  min-width: 50px;
+}
+/* RESPONSIVE: keep card width fixed across breakpoints.
+   We only change font-size / padding / cover height, not the card width. */
+@media (max-width: 880px) {
+  :root {
+    --card-cover-height: 120px;
+    --card-padding: 12px;
+    /* DO NOT reduce --card-width here — keep consistent */
+  }
+
+  .engagement-item { font-size: 0.8rem; gap: 4px; }
+  .footer-icon { font-size: 0.85rem; }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --card-cover-height: 110px;
+    --card-padding: 10px;
+  }
+
+  .book-title { font-size: 0.95rem; }
+  .engagement-item { font-size: 0.78rem; gap: 3px; padding: 2px 4px; }
+  .footer-icon { font-size: 0.8rem; }
+  .star-icon, .footer-icon.star { width: 16px; height: 16px; font-size: 1rem; }
+}
+
+/* small phones: keep the footer on one line; reduce gaps if necessary */
+@media (max-width: 420px) {
+  .engagement-item { gap: 2px; padding: 2px 3px; font-size: 0.75rem; }
+  .rating { min-width: 46px; }
+}
+
+/* If the viewport is narrower than the card width, the container will scroll (recommended),
+   or you can adjust parent container to allow wrapping to next row. Don't reduce card width. */

@@ -1,0 +1,158 @@
+/* --- General Page Layout --- */
+.about-page-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #2e8ac3; /* Light gray background */
+  font-family: 'Roboto', sans-serif;
+  color: #26a358; /* Dark blue-gray for text */
+}
+
+.main-content {
+  flex: 1;
+  padding-top: 100px;
+  padding: 4rem 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* --- Hero Section --- */
+.about-hero-section {
+  text-align: center;
+  margin-bottom: 4rem;
+  padding: 2rem 0;
+  background-color: #afb3f5;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.about-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 3rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.about-subtitle {
+  font-size: 1.25rem;
+  color: #7f8c8d;
+}
+
+/* --- Content Sections --- */
+.about-content-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+.content-block {
+  background-color: #ffffff;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.content-heading {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 2rem;
+  font-weight: 600;
+  color: #34495e;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.content-paragraph {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #555;
+  margin-bottom: 1.5rem;
+}
+
+/* --- Values Section --- */
+.values-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.values-list li {
+  background-color: #ecf0f1;
+  padding: 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.6;
+  border-left: 4px solid #3498db;
+}
+
+.value-name {
+  font-weight: bold;
+  color: #2c3e50;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* --- Team Section --- */
+.team-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.team-member {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 250px;
+}
+
+.team-photo {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #3498db;
+  margin-bottom: 1rem;
+}
+
+.member-name {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0.5rem 0;
+}
+
+.member-role {
+  font-style: italic;
+  color: #7f8c8d;
+  margin-bottom: 1rem;
+}
+
+.member-bio {
+  font-size: 0.9rem;
+  color: #555;
+  line-height: 1.6;
+}
+
+/* --- Responsive adjustments --- */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 2rem 1rem;
+  }
+  
+  .about-title {
+    font-size: 2.25rem;
+  }
+
+  .content-heading {
+    font-size: 1.75rem;
+  }
+}

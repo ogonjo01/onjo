@@ -1,0 +1,52 @@
+/* src/components/Ad/Ad.css */
+.ad-container {
+  margin: 24px 0;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  position: relative;
+  /* Ensure ad container doesn’t inherit unwanted flex/grid behavior */
+  display: block !important;
+  width: 100%;
+  max-width: 100%;
+}
+
+.ad-container .ad-placeholder {
+  font-size: 14px;
+  color: #6c757d;
+  font-style: italic;
+  padding: 8px;
+}
+
+.ad-container.ad-inline {
+  margin: 20px 0;
+  width: 100%;
+  text-align: center;
+  background: #fff;
+  border: 1px dashed #dee2e6;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+/* Base styling for AdSense, overridden by useEffect/MutationObserver */
+.ad-container ins.adsbygoogle {
+  display: block;
+  width: 100%;
+  height: 80px;
+  max-height: 80px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .ad-container {
+    margin: 16px 0;
+    padding: 12px;
+  }
+  .ad-container ins.adsbygoogle {
+    height: 50px;
+    max-height: 50px;
+  }
+}

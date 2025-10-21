@@ -1,0 +1,39 @@
+.explore-page {
+  padding: 20px;
+  margin-top: 80px; /* adjust this to match your header height */
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.explore-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.explore-header h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.explore-loading,
+.explore-error,
+.explore-empty {
+  text-align: center;
+  padding: 30px;
+  color: #666;
+  font-size: 1rem;
+}
+
+.explore-sentinel {
+  height: 1px;
+}

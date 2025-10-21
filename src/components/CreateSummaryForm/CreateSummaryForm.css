@@ -1,0 +1,119 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  max-width: 800px;
+  width: 90%;
+  position: relative;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+
+.close-button {
+  position: fixed;
+  top: 20px;
+  right: 30px;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  color: #333;
+  z-index: 2100;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.summary-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.summary-form label {
+  font-weight: bold;
+  color: #555;
+}
+
+.summary-form input,
+.summary-form textarea,
+.summary-form select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 1rem;
+}
+
+.summary-form button {
+  padding: 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.summary-form button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+.summary-form button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.modal-content.large {
+  max-width: 800px;
+  width: 90%;
+}
+
+.summary-form .ql-container {
+  min-height: 200px;
+  margin-bottom: 1rem;
+}
+
+/* Make toolbar sticky */
+.ql-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  border-bottom: 1px solid #ccc;
+}
+
+/* Slug preview */
+.slug-preview {
+  display: block;
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 2px;
+  font-family: monospace;
+}
+
+.slug-preview code {
+  background: #f4f4f4;
+  padding: 2px 4px;
+  border-radius: 3px;
+}

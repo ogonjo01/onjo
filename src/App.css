@@ -1,0 +1,73 @@
+:root{
+  --header-height: 56px; /* unify to 56px */
+  --category-height: 48px;
+}
+
+
+
+/* main content scroller spacing (keep existing rules you had) */
+.main-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  box-sizing: border-box;
+}
+
+/* When homepage, reserve space for fixed header + sticky category */
+body.homepage-fixed .main-content {
+  padding-top: calc(var(--header-height) + var(--category-height) + 12px);
+}
+
+/* When header/category are hidden globally, remove the extra space */
+body.scroll-hide-global .main-content {
+  padding-top: 12px !important;
+}
+
+/* ---------- slide rules (global, single source of truth) ---------- */
+
+/* Ensure both header and category are positioned and transitionable */
+.og-header,
+.category-filter-container {
+  transition: transform 220ms cubic-bezier(.2,.9,.2,1), opacity 180ms ease;
+  will-change: transform, opacity;
+}
+
+/* Homepage: always visible (force keep) */
+body.homepage-fixed .og-header,
+body.homepage-fixed .category-filter-container {
+  transform: translateY(0) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* When the page toggles .scroll-hide-global: hide both together */
+body.scroll-hide-global .og-header,
+body.scroll-hide-global .category-filter-container {
+  transform: translateY(-120%);
+  opacity: 0;
+  pointer-events: none;
+}
+/* Table styling for summaries */
+.summary-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+.summary-content th,
+.summary-content td {
+  border: 1px solid #333;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.summary-content th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+.summary-content td {
+  background-color: #fff;
+}
