@@ -43,7 +43,7 @@ const SubscriptionPopup = ({ onClose }) => {
       try { data = await response.json(); } catch (err) {}
 
       if (response.ok) {
-        setMessage('🎉 Subscribed! Check your inbox for confirmation.');
+        setMessage('🎉 Subscribed! Check your inbox for your first guide.');
         localStorage.setItem('subscribedAt', Date.now()); // Store subscription timestamp
         setEmail('');
         setTimeout(handleClose, 3000); // Auto-close after success
@@ -79,15 +79,15 @@ const SubscriptionPopup = ({ onClose }) => {
         </button>
 
         <div className="sp-popup-content">
-          <h2 className="sp-popup-title">Unlock Business Potential in 10s</h2>
-          <p className="sp-popup-sub">Get curated book summaries, startup playbooks, and actionable insights weekly—free!</p>
+          <h2 className="sp-popup-title">Unlock Smarter Choices in Seconds</h2>
+          <p className="sp-popup-sub">Get niche product deep-dives, buying guides, and real-user insights weekly—free!</p>
 
           <ul className="sp-popup-benefits">
-            <li><Check size={16} /> Actionable insights from top books</li>
-            <li><Check size={16} /> Foundational strategies for PMF & fundraising</li>
-            <li><Check size={16} /> Growth playbooks with templates</li>
-            <li><Check size={16} /> Leadership tips for teams & culture</li>
-            <li><Check size={16} /> Strategic curation for founders</li>
+            <li><Check size={16} /> Pros/cons from 500+ verified reviews</li>
+            <li><Check size={16} /> Step-by-step selection for your needs</li>
+            <li><Check size={16} /> Top picks with eco & budget options</li>
+            <li><Check size={16} /> How-tos for everyday upgrades</li>
+            <li><Check size={16} /> Tailored recs for hobbyists & pros</li>
           </ul>
 
           <form onSubmit={submit} className="sp-popup-form">
@@ -95,7 +95,7 @@ const SubscriptionPopup = ({ onClose }) => {
               <Mail size={18} className="sp-popup-icon" />
               <input
                 type="email"
-                placeholder="you@company.com"
+                placeholder="you@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -109,7 +109,7 @@ const SubscriptionPopup = ({ onClose }) => {
               disabled={loading}
               className="sp-popup-submit"
             >
-              {loading ? 'Subscribing...' : 'Get Free Insights'}
+              {loading ? 'Subscribing...' : 'Get Free Guides'}
             </button>
           </form>
 
@@ -118,7 +118,7 @@ const SubscriptionPopup = ({ onClose }) => {
 
           <div className="sp-popup-testimonial">
             <Star size={16} className="sp-popup-star" />
-            <p>“Hit 2x MRR in 3 months with these playbooks!” — Maya, Founder</p>
+            <p>“Saved hours and $200 on my next gadget—game-changer!” — Alex, Shopper</p>
           </div>
 
           <p className="sp-popup-legal">No spam • Unsubscribe anytime</p>

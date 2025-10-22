@@ -115,12 +115,12 @@ const SummaryView = () => {
         });
         setPostId(data.id);
 
-        setLikes(0);
-        setViews(0);
-        setCommentsCount(0);
+        // NOTE: do not reset likes/views/comments to 0 here — we'll fetch authoritative counts next
+        // setLikes(0); setViews(0); setCommentsCount(0);
 
         setIsLoading(false);
 
+        // fire-and-forget; backgroundFetchFollowups will log errors
         backgroundFetchFollowups(data.id, data.category).catch((e) => console.debug('[backgroundFetchFollowups] error', e));
       } catch (err) {
         console.error('Error loading minimal summary:', err);
@@ -138,51 +138,112 @@ const SummaryView = () => {
 
   const backgroundFetchFollowups = async (resolvedPostId, category = '') => {
     try {
-      const { data, error } = await supabase
-        .from('book_summaries')
-        .select(SELECT_WITH_COUNTS)
-        .eq('id', resolvedPostId)
-        .single();
+      if (!resolvedPostId) {
+        console.warn('[backgroundFetchFollowups] missing post id');
+        return;
+      }
 
-      if (!error && data) {
-        const formatted = {
-          ...data,
-          likes_count: Array.isArray(data?.likes_count) ? Number(data?.likes_count?.[0]?.count ?? 0) : Number(data?.likes_count ?? 0),
-          views_count: Array.isArray(data?.views_count) ? Number(data?.views_count?.[0]?.count ?? 0) : Number(data?.views_count ?? 0),
-          comments_count: Array.isArray(data?.comments_count) ? Number(data?.comments_count?.[0]?.count ?? 0) : Number(data?.comments_count ?? 0),
-          category: (data?.category == null) ? '' : String(data.category).trim(),
-        };
-        setSummary((prev) => prev ? { ...prev, ...formatted } : formatted);
-        setLikes(formatted.likes_count || 0);
-        setViews(formatted.views_count || 0);
-        setCommentsCount(formatted.comments_count || 0);
-      } else if (error) console.debug('counts fetch error', error);
+      // 1) authoritative initial read (uses SELECT_WITH_COUNTS)
+      try {
+        const { data: fullData, error: fullErr } = await supabase
+          .from('book_summaries')
+          .select(SELECT_WITH_COUNTS)
+          .eq('id', resolvedPostId)
+          .single();
 
+        if (fullErr) {
+          console.warn('[backgroundFetchFollowups] initial counts fetch error', fullErr);
+        }
+
+        if (fullData) {
+          const formatted = normalizeRow(fullData);
+          setSummary(prev => prev ? { ...prev, ...formatted } : formatted);
+          setLikes(formatted.likes_count || 0);
+          setViews(formatted.views_count || 0);
+          setCommentsCount(formatted.comments_count || 0);
+        }
+      } catch (e) {
+        console.error('[backgroundFetchFollowups] unexpected error during initial fetch', e);
+      }
+
+      // 2) rating / user-specific info (best-effort)
       try {
         const { data: ratingData, error: ratingErr } = await supabase.rpc('get_average_rating', { p_post_id: resolvedPostId });
         if (!ratingErr && Array.isArray(ratingData) && ratingData[0] && ratingData[0].average_rating !== null) {
           setAvgRating(Math.round(Number(ratingData[0].average_rating) * 10) / 10);
+        } else if (ratingErr) {
+          console.warn('[backgroundFetchFollowups] get_average_rating error', ratingErr);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[backgroundFetchFollowups] get_average_rating unexpected error', e);
+      }
 
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const [likesRes, ratingRes] = await Promise.all([
-            supabase.from('likes').select('id').eq('post_id', resolvedPostId).eq('user_id', user.id),
-            supabase.from('ratings').select('rating').eq('post_id', resolvedPostId).eq('user_id', user.id).maybeSingle(),
-          ]);
-          if (likesRes?.data && likesRes.data.length) setUserHasLiked(true);
-          if (ratingRes?.data && ratingRes.data.rating) setUserRating(ratingRes.data.rating);
+          try {
+            const [likesRes, ratingRes] = await Promise.all([
+              supabase.from('likes').select('id').eq('post_id', resolvedPostId).eq('user_id', user.id),
+              supabase.from('ratings').select('rating').eq('post_id', resolvedPostId).eq('user_id', user.id).maybeSingle(),
+            ]);
+            if (likesRes?.data && likesRes.data.length) setUserHasLiked(true);
+            if (ratingRes?.data && ratingRes.data.rating) setUserRating(ratingRes.data.rating);
+          } catch (e) {
+            console.warn('[backgroundFetchFollowups] user-specific queries error', e);
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[backgroundFetchFollowups] auth.getUser error', e);
+      }
 
+      // 3) increment views by inserting into views table (triggers will update book_summaries)
       try {
-        await supabase.rpc('increment_views', { post_id: resolvedPostId });
-        setViews((v) => (Number(v) || 0) + 1);
-      } catch (e) {}
+        console.log('[backgroundFetchFollowups] inserting view for', resolvedPostId);
+        const { data: insertData, error: insertErr } = await supabase
+          .from('views')
+          .insert([{ post_id: resolvedPostId, user_id: null }]);
 
-      if ((category ?? '').trim()) fetchRecommended(category, 10, resolvedPostId).catch(() => {});
+        if (insertErr) {
+          console.error('[backgroundFetchFollowups] views insert error', insertErr);
+          // optimistic fallback so user sees something
+          setViews((v) => (Number(v) || 0) + 1);
+        } else {
+          // optimistic bump (snappy UI)
+          setViews((v) => (Number(v) || 0) + 1);
+
+          // 4) re-fetch authoritative counts to avoid stale overwrite from later fetches
+          try {
+            const { data: refreshed, error: refreshErr } = await supabase
+              .from('book_summaries')
+              .select('views_count, likes_count, comments_count')
+              .eq('id', resolvedPostId)
+              .maybeSingle();
+
+            if (refreshErr) {
+              console.warn('[backgroundFetchFollowups] could not refresh counts', refreshErr);
+            } else if (refreshed) {
+              const authoritativeViews = Number(refreshed.views_count ?? 0);
+              console.log('[backgroundFetchFollowups] refreshed views_count from DB:', authoritativeViews);
+              setViews(authoritativeViews);
+              // update summary so future logic reads consistent values
+              setSummary(prev => prev ? { ...prev, views_count: authoritativeViews } : prev);
+              // Optionally update likes/comments if you want authoritative values there too
+            }
+          } catch (e) {
+            console.error('[backgroundFetchFollowups] unexpected error while re-fetching counts', e);
+          }
+        }
+      } catch (e) {
+        console.error('[backgroundFetchFollowups] unexpected error inserting view', e);
+        setViews((v) => (Number(v) || 0) + 1);
+      }
+
+      // 5) recommended content (best-effort)
+      if ((category ?? '').trim()) {
+        fetchRecommended(category, 10, resolvedPostId).catch(err => {
+          console.warn('[backgroundFetchFollowups] fetchRecommended error', err);
+        });
+      }
     } catch (err) {
       console.error('backgroundFetchFollowups error:', err);
     }
@@ -234,8 +295,12 @@ const SummaryView = () => {
         const { data: ratingData, error: ratingErr } = await supabase.rpc('get_average_rating', { p_post_id: postId });
         if (!ratingErr && Array.isArray(ratingData) && ratingData[0] && ratingData[0].average_rating !== null) {
           setAvgRating(Math.round(Number(ratingData[0].average_rating) * 10) / 10);
+        } else if (ratingErr) {
+          console.warn('get_average_rating error', ratingErr);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('unexpected get_average_rating error', e);
+      }
 
       setUserRating(value);
       return true;
@@ -347,7 +412,9 @@ const SummaryView = () => {
           setRecommendedContent(rows.slice(0, limit));
           return rows.slice(0, limit);
         }
-      } catch (rpcErr) {}
+      } catch (rpcErr) {
+        console.warn('get_top_viewed_by_category rpc error', rpcErr);
+      }
 
       const { data, error } = await supabase
         .from('book_summaries')
@@ -453,7 +520,7 @@ const SummaryView = () => {
         </div>
       </header>
 
-      <article className="summary-body" dangerouslySetInnerHTML={{ __html: processedSummary }} />
+      <article className="summary-body" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(processedSummary) }} />
 
       {(isRecommending || (recommendedContent && recommendedContent.length > 0)) && (
         <HorizontalCarousel
