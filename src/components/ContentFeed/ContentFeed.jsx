@@ -52,12 +52,10 @@ const parseNumber = (v) => {
     return Number.isFinite(n) ? n : 0;
   }
   if (Array.isArray(v) && v.length) {
-    // e.g. [{ avg: '4.2' }] or [{ count: '3' }]
     const first = v[0];
     return parseNumber(first.avg ?? first.count ?? first.value ?? first.avg_rating ?? first.rating ?? first);
   }
   if (typeof v === 'object') {
-    // e.g. { avg: '4.2' } or { count: '3' }
     return parseNumber(v.avg ?? v.count ?? v.value ?? v.avg_rating ?? v.rating ?? v.rating_count);
   }
   return 0;
@@ -70,17 +68,21 @@ const normalizeRow = (r = {}) => {
 
   // avg_rating may come as avg_rating, avg, rating or as aggregates
   const avg_rating = parseNumber(r.avg_rating ?? r.avg ?? r.rating ?? r.average_rating);
-  // rating_count may come as rating_count, ratings_count, count, or aggregate
   const rating_count = parseNumber(r.rating_count ?? r.ratings_count ?? r.rating_count_aggregate ?? r.count ?? r.rating_count_value);
+
+  // Defensive fallbacks for title / author / image
+  const safeTitle = r.title ?? 'Untitled';
+  const safeAuthor = r.author ?? r.creator_name ?? r.creator ?? 'Unknown';
+  const safeImage = r.image_url ?? r.cover ?? r.cover_url ?? r.image ?? null;
 
   return {
     id: r.id,
-    slug: r.slug ?? null, // <- include slug so cards can prefer it
-    title: r.title,
-    author: r.author,
+    slug: r.slug ?? null,
+    title: safeTitle,
+    author: safeAuthor,
     summary: r.summary,
     category: r.category,
-    image_url: r.image_url,
+    image_url: safeImage,
     affiliate_link: r.affiliate_link,
     likes_count: Number(likes || 0),
     views_count: Number(views || 0),
@@ -99,15 +101,15 @@ const fetchRpcOrFallback = async (rpcName, { limit = ITEMS_PER_CAROUSEL, categor
     const args = { p_limit: limit };
     if (category) args.p_category = category;
     const rpcRes = await supabase.rpc(rpcName, args);
+    // debug: show rpc shape
     if (!rpcRes.error && rpcRes.data) {
+      console.debug('[fetchRpcOrFallback] rpc data', { rpcName, category, limit, count: (rpcRes.data || []).length, sample: (rpcRes.data || [])[0] });
       return safeData(rpcRes.data).map(normalizeRow);
     }
     if (rpcRes.error) {
-      // continue to fallback
       console.warn(`[rpc] ${rpcName} error:`, rpcRes.error);
     }
   } catch (e) {
-    // fallback below
     console.warn(`[rpc] ${rpcName} threw`, e?.message || e);
   }
 
@@ -118,6 +120,9 @@ const fetchRpcOrFallback = async (rpcName, { limit = ITEMS_PER_CAROUSEL, categor
     q = q.limit(500);
     const { data, error } = await q;
     if (error) throw error;
+
+    // debug: show fallback fetch shape
+    console.debug('[fetchRpcOrFallback] fallback data', { rpcName, category, rows: (data || []).length, sample: (data || [])[0] });
 
     // normalize early
     const rows = (data || []).map(normalizeRow);
@@ -181,7 +186,8 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   // FAST lightweight fetch for immediate UI (by category or global)
-  const fastFetchList = useCallback(async (limit = 6, category = null) => {
+  // DEFAULT limit now equals ITEMS_PER_CAROUSEL to avoid half-populated carousels
+  const fastFetchList = useCallback(async (limit = ITEMS_PER_CAROUSEL, category = null) => {
     // check cache
     const cacheKey = category ? `cat:${category}` : `global`;
     const cache = fastCacheRef.current.get(cacheKey);
@@ -198,6 +204,10 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
       const { data, error } = await q;
       if (error) throw error;
+
+      // debug: show fast fetch results
+      console.debug('[fastFetchList]', { category, limit, count: (data || []).length, sample: (data || [])[0] });
+
       const normalized = (data || []).map((r) => normalizeRow(r));
       fastCacheRef.current.set(cacheKey, normalized);
       return normalized;
@@ -292,7 +302,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     }
   }, [categoryQueue, loadingCategories, fetchContentBlock, fastFetchList, replaceCategoryBlock]);
 
-  // MAIN orchestration: similar to your previous flow but initial category loads use placeholders + background replacement
+  // MAIN orchestration
   useEffect(() => {
     (async () => {
       setLoadingGlobal(true);
@@ -305,7 +315,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       if (searchQuery && searchQuery.trim()) {
         const start = Date.now();
         try {
-          const fast = await fastFetchList(6);
+          const fast = await fastFetchList(ITEMS_PER_CAROUSEL);
           if (mountedRef.current) {
             setGlobalContent({ newest: fast, mostLiked: fast, highestRated: fast, mostViewed: fast });
           }
@@ -328,7 +338,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       if (specific) {
         const start = Date.now();
         try {
-          const placeholder = await fastFetchList(6, selectedCategory);
+          const placeholder = await fastFetchList(ITEMS_PER_CAROUSEL, selectedCategory);
           if (mountedRef.current) {
             setLoadedCategoryBlocks([{ category: selectedCategory, newest: placeholder, mostLiked: placeholder, highestRated: placeholder, mostViewed: placeholder }]);
           }
@@ -356,7 +366,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       const start = Date.now();
       try {
         // 1) FAST placeholder global content (single cheap request) -> immediate paint
-        const fast = await fastFetchList(6);
+        const fast = await fastFetchList(ITEMS_PER_CAROUSEL);
         if (!mountedRef.current) return;
         setGlobalContent({ newest: fast, mostLiked: fast, highestRated: fast, mostViewed: fast });
 
