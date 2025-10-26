@@ -1,4 +1,3 @@
-// src/components/ContentFeed/ContentFeed.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../supabase/supabaseClient';
 import BookSummaryCard from '../BookSummaryCard/BookSummaryCard';
@@ -61,19 +60,24 @@ const parseNumber = (v) => {
   return 0;
 };
 
+const _safeString = (v) => {
+  if (v === null || v === undefined) return '';
+  if (typeof v !== 'string') return String(v);
+  return v.trim();
+};
+
 const normalizeRow = (r = {}) => {
   const likes = parseNumber(r.likes_count);
   const views = parseNumber(r.views_count);
   const comments = parseNumber(r.comments_count);
 
-  // avg_rating may come as avg_rating, avg, rating or as aggregates
   const avg_rating = parseNumber(r.avg_rating ?? r.avg ?? r.rating ?? r.average_rating);
   const rating_count = parseNumber(r.rating_count ?? r.ratings_count ?? r.rating_count_aggregate ?? r.count ?? r.rating_count_value);
 
-  // Defensive fallbacks for title / author / image
-  const safeTitle = r.title ?? 'Untitled';
-  const safeAuthor = r.author ?? r.creator_name ?? r.creator ?? 'Unknown';
-  const safeImage = r.image_url ?? r.cover ?? r.cover_url ?? r.image ?? null;
+  // Defensive fallbacks — use trimmed checks so whitespace-only strings don't count
+  const safeTitle = _safeString(r.title) || 'Untitled';
+  const safeAuthor = _safeString(r.author) || _safeString(r.creator_name) || _safeString(r.creator) || '';
+  const safeImage = _safeString(r.image_url) || _safeString(r.cover) || _safeString(r.cover_url) || null;
 
   return {
     id: r.id,
@@ -101,8 +105,8 @@ const fetchRpcOrFallback = async (rpcName, { limit = ITEMS_PER_CAROUSEL, categor
     const args = { p_limit: limit };
     if (category) args.p_category = category;
     const rpcRes = await supabase.rpc(rpcName, args);
-    // debug: show rpc shape
     if (!rpcRes.error && rpcRes.data) {
+      // debug: inspect rpc output shape
       console.debug('[fetchRpcOrFallback] rpc data', { rpcName, category, limit, count: (rpcRes.data || []).length, sample: (rpcRes.data || [])[0] });
       return safeData(rpcRes.data).map(normalizeRow);
     }
@@ -121,7 +125,7 @@ const fetchRpcOrFallback = async (rpcName, { limit = ITEMS_PER_CAROUSEL, categor
     const { data, error } = await q;
     if (error) throw error;
 
-    // debug: show fallback fetch shape
+    // debug: inspect fallback shape
     console.debug('[fetchRpcOrFallback] fallback data', { rpcName, category, rows: (data || []).length, sample: (data || [])[0] });
 
     // normalize early
@@ -205,7 +209,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       const { data, error } = await q;
       if (error) throw error;
 
-      // debug: show fast fetch results
+      // debug: show fast fetch results so you can inspect returned rows in console
       console.debug('[fastFetchList]', { category, limit, count: (data || []).length, sample: (data || [])[0] });
 
       const normalized = (data || []).map((r) => normalizeRow(r));
@@ -439,8 +443,8 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
   }, [hasMoreCategories, loadingCategories, loadNextCategoryBatch]);
 
   const renderCards = (items) => (items || []).map((summary) => (
-    // use slug || id as key so when slugs are backfilled React keys are stable
-    <BookSummaryCard key={String(summary.slug || summary.id)} summary={summary} onEdit={onEdit} onDelete={onDelete} />
+    // Use stable DB id as the key. Do NOT prefer slug here — slug may be backfilled later and would change the key.
+    <BookSummaryCard key={String(summary.id ?? summary.slug)} summary={summary} onEdit={onEdit} onDelete={onDelete} />
   ));
 
   const isForYou = selectedCategory === 'For You' || selectedCategory === 'All';

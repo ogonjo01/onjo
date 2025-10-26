@@ -1,4 +1,3 @@
-// src/components/BookSummaryCard/BookSummaryCard.jsx
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -108,8 +107,7 @@ const BookSummaryCard = ({ summary = {}, onEdit, onDelete }) => {
             {title}
           </h3>
 
-          {/* Explicit fallback to 'Unknown' so CSS/hiding won't collapse the element */}
-          <p className="book-author">by {authorDisplay || 'Unknown'}</p>
+          <p className="book-author">by {authorDisplay}</p>
 
           <p className="summary-text" aria-hidden>
             {displayText}
