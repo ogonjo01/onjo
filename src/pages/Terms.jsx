@@ -4,7 +4,7 @@ import React from 'react';
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO</h1> {/* Updated Oct 15, 2025: Brand consistency */}
+      <h1 className="header-title">ONJO</h1> {/* Unchanged: Brand consistency */}
     </div>
   </header>
 );
@@ -13,7 +13,7 @@ const Header = () => (
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Updated: Brand alignment */}
+      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Unchanged: Brand alignment */}
     </div>
   </footer>
 );
@@ -131,28 +131,28 @@ const Terms = () => {
         <main className="main-content">
           <div className="hero-section">
             <h1 className="page-title">Terms of Service</h1>
-            <p className="last-updated">Last updated: October 15, 2025</p> {/* Updated: Current date */}
+            <p className="last-updated">Last updated: November 04, 2025</p> {/* Refined: Current date */}
           </div>
           
           <div className="content-card">
             <div className="section">
               <h2 className="section-title">Introduction</h2> {/* Unchanged: Standard legal */}
               <p className="section-content">
-                Welcome to ONJO, a platform providing free, text-based guides and reviews on niche products and smart choices. By accessing or using our Service, you agree to be bound by these Terms of Service ("Terms"). If you do not agree with any part of these Terms, you may not use our Service. {/* Updated: From books to niche products/guides */}
+                Welcome to ONJO, a storytelling brand crafting novels that explore the collision of ambition and emotion. By accessing or using our Service, you agree to be bound by these Terms of Service ("Terms"). If you do not agree with any part of these Terms, you may not use our Service. {/* Refined: From products to storytelling/novels; echoes About hook */}
               </p>
             </div>
             
             <div className="section">
               <h2 className="section-title">1. Intellectual Property & Content</h2>
               <p className="section-content">
-                All content on the Service, including product guides, reviews, text, graphics, and logos, is our property or the property of our content suppliers and is protected by copyright and intellectual property laws. The guides and reviews are intended for personal, informational use only. You may not reproduce, distribute, modify, or create derivative works from our content without our explicit written permission. {/* Updated: To product guides/reviews */}
+                All content on the Service, including novels, stories, text, graphics, and logos, is our property or the property of our content suppliers and is protected by copyright and intellectual property laws. The stories and narratives are intended for personal, inspirational use only. You may not reproduce, distribute, modify, or create derivative works from our content without our explicit written permission. {/* Refined: To novels/stories/narratives; ties to "inspirational" mission */}
               </p>
             </div>
             
             <div className="section">
               <h2 className="section-title">2. Disclaimers and Limitation of Liability</h2>
               <p className="section-content">
-                The Service is provided on an "as is" and "as available" basis. We do not make any warranties, express or implied, regarding the accuracy, reliability, or completeness of the product guides and reviews. The insights provided are not a substitute for professional shopping or product advice. We are not liable for any decisions made based on the information from our Service. {/* Updated: From business to shopping/product decisions */}
+                The Service is provided on an "as is" and "as available" basis. We do not make any warranties, express or implied, regarding the accuracy, reliability, or completeness of the stories and narratives. The insights provided are not a substitute for professional advice on ambition, relationships, or personal growth. We are not liable for any decisions made based on the reflections from our Service. {/* Refined: From products/shopping to stories/narratives; adapts to emotional themes */}
               </p>
             </div>
             
@@ -162,9 +162,9 @@ const Terms = () => {
                 You agree not to use the Service for any unlawful or prohibited purpose. This includes, but is not limited to:
               </p>
               <ul className="list">
-                <li>Copying, distributing, or reselling the content, guides, or reviews from our website.</li> {/* Updated: Add guides/reviews */}
+                <li>Copying, distributing, or reselling the novels, stories, or content from our website.</li> {/* Refined: To novels/stories */}
                 <li>Attempting to gain unauthorized access to our systems.</li>
-                <li>Using any automated means (e.g., bots, scrapers) to collect or access our content or affiliate links.</li> {/* Updated: Tie to affiliates */}
+                <li>Using any automated means (e.g., bots, scrapers) to collect or access our content or links.</li> {/* Minor: Generalize from affiliates */}
                 <li>Using the Service in any way that could harm, disable, or overburden our website or servers.</li>
               </ul>
             </div>

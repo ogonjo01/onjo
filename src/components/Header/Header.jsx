@@ -67,7 +67,7 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
           </button>
           <Link to="/" className="og-logo" aria-label="Home">
             <div className="og-logo-mark">O</div>
-            <div className="og-logo-text">ONJO</div> {/* Updated Oct 15, 2025: Rebrand from OGONJO */}
+            <div className="og-logo-text">ONJO</div> {/* Unchanged: Core brand */}
           </Link>
         </div>
 
@@ -75,8 +75,8 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search guides (product, review, category)..." /* Updated: From summaries to guides/products */
-            aria-label="Search guides" /* Updated: Accessibility alignment */
+            placeholder="Search stories, empires, or passions..." /* Refined Nov 04, 2025: From guides/products to storytelling themes—evokes draft's ambition/emotion */
+            aria-label="Search stories" /* Refined: Accessibility for narrative discovery */
             autoComplete="off"
             className="search-input"
           />
@@ -98,22 +98,27 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
               <>
                 <button className="profile-button" onClick={() => setShowProfileModal(true)}>
                   <span className="letter-avatar">{avatarLetter}</span>
-                  <span className="profile-name">{profile?.username || "Profile"}</span>
+                  <span className="profile-name">{profile?.username || "Your Story"}</span> {/* Refined: From "Profile" to subtle narrative nod */}
                 </button>
                 <button className="logout-button" onClick={handleSignOut}>Sign Out</button>
 
                 {/* Only show Add Summary if user can_add_summary is true */}
                 {profile?.can_add_summary && (
                   <button className="create-button" onClick={onAddClick}>
-                    + Add Guide {/* Updated: From "Add Summary" to "Add Guide" for niche focus */}
+                    + Share Tale {/* Refined: From "Add Guide" to "Share Tale"—ties to mission of real-fiction sharing */}
                   </button>
                 )}
               </>
             ) : (
-              <Link to="/auth" className="sign-in-link">Sign In</Link>
+              <Link to="/auth" className="sign-in-link">
+                Enter the World
+                {/* Refined Nov 04, 2025: From "Sign In" to immersive CTA evoking story worlds */}
+              </Link>
             )}
-
-            <Link to="/subscribe" className="subscribe-button">Subscribe</Link> {/* Unchanged: Route fits */}
+            <Link to="/subscribe" className="subscribe-button">
+              Join the Journey
+              {/* Refined Nov 04, 2025: From "Subscribe" to emotional echo of draft's "chasing dreams" */}
+            </Link>
           </div>
         </div>
       </header>
@@ -125,20 +130,26 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
 
             {session ? (
               <>
-                <button onClick={() => { setShowProfileModal(true); setMenuOpen(false); }}>Profile</button>
+                <button onClick={() => { setShowProfileModal(true); setMenuOpen(false); }}>
+                  Your Story {/* Refined: Consistent with desktop */}
+                </button>
                 <button onClick={() => { handleSignOut(); setMenuOpen(false); }}>Sign Out</button>
 
                 {profile?.can_add_summary && (
                   <button onClick={() => { onAddClick(); setMenuOpen(false); }}>
-                    + Add Guide {/* Updated: Consistent with desktop */}
+                    + Share Tale {/* Refined: Mirror desktop for cohesion */}
                   </button>
                 )}
               </>
             ) : (
-              <Link to="/auth" onClick={() => setMenuOpen(false)}>Sign In</Link>
+              <Link to="/auth" onClick={() => setMenuOpen(false)}>
+                Enter the World {/* Refined: Consistent CTA */}
+              </Link>
             )}
 
-            <Link to="/subscribe" onClick={() => setMenuOpen(false)}>Subscribe</Link>
+            <Link to="/subscribe" onClick={() => setMenuOpen(false)}>
+              Join the Journey {/* Refined: Mobile match */}
+            </Link>
           </div>
           <div className="overlay" onClick={() => setMenuOpen(false)} />
         </>

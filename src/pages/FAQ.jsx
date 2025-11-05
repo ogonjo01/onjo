@@ -5,7 +5,7 @@ import { ChevronDown } from 'lucide-react';
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO</h1> {/* Updated Oct 15, 2025: Brand consistency */}
+      <h1 className="header-title">ONJO</h1> {/* Unchanged: Brand consistency */}
     </div>
   </header>
 );
@@ -14,7 +14,7 @@ const Header = () => (
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Updated: Brand alignment */}
+      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Unchanged: Brand alignment */}
     </div>
   </footer>
 );
@@ -57,24 +57,24 @@ const AccordionContent = ({ children }) => (
 const FAQ = () => {
   const faqs = [
     {
-      question: "What is ONJO?", // Updated: Brand + niche focus
-      answer: "ONJO is a platform offering free, high-quality, text-based guides and reviews on niche products and smart choices. Our goal is to provide actionable insights from real reviews—pros/cons, how-tos, and top picks—without subscriptions or fluff." // Updated: From books to products/guides
+      question: "What is ONJO?", // Unchanged: Core brand question
+      answer: "ONJO is a storytelling brand forged in the collision of ambition and emotion—crafting entrepreneurial romance novels that expose the human scars behind empires, heartbreaks, and unbreakable resolve." // Refined Nov 05, 2025: From products to draft's "collision," "empires," "hearts break," "rebuild"
     },
     {
-      question: "How is ONJO free?", // Updated: Brand
-      answer: "Our platform is completely free to use. We maintain the service through transparent affiliate links (e.g., to Amazon for recommended products) and subtle sponsorships, ensuring you get unbiased value at no cost." // Updated: Tie to affiliates from About Us
+      question: "How is ONJO free?", // Unchanged: Monetization query
+      answer: "Our worlds are open to all, no barriers to entry. We sustain through subtle partnerships that honor transparency, ensuring every tale reaches you unfiltered and true." // Refined: From affiliates to "worlds" and "true" echoing "feels real"; subtle mission tie
     },
     {
-      question: "Can I download the product guides?", // Updated: From summaries to guides
-      answer: "Our guides are designed for quick, convenient reading directly on our website. To uphold content integrity and our model, we don't offer full downloads yet—but printable PDFs for select deep-dives are coming soon. View anytime on any device." // Updated: Product focus + forward-looking
+      question: "Can I download the stories?", // Refined: From guides to stories
+      answer: "Our novels are crafted for immersive, on-site discovery to preserve their emotional pulse. Full downloads aren't available yet—but exclusive chapter PDFs for deep reflections are on the horizon. Dive in anytime." // Refined: "Emotional pulse" nods to "heart race"; forward-looking to "worlds"
     },
     {
-      question: "How often are new guides added?", // Updated: From summaries to guides
-      answer: "We're committed to growing our library. We add new, reader-requested niche guides weekly—covering trends like eco-gadgets or workflow tools. Check our homepage for the latest drops." // Updated: Niche examples
+      question: "How often are new stories released?", // Refined: From guides to stories
+      answer: "We release fresh installments monthly, drawn from reader echoes—tales of boardroom fires and whispered longings. Follow our drops to chase the next empire's rise." // Refined: Cadence to monthly for novels; themes from "business...passion," "hunger for greatness"
     },
     {
       question: "What if I have more questions?", // Unchanged: General
-      answer: "We're here to help! If you have further questions or topic suggestions, visit our Contact Us page to message us. We'll respond promptly." // Updated: Add suggestion nod
+      answer: "We're building this journey together. For deeper dives or tale suggestions, reach out via our Connect page—we're eager to hear your reflections." // Refined: "Journey together" evokes community; "reflections" from draft's "mind reflect"
     }
   ];
 
@@ -253,7 +253,7 @@ const FAQ = () => {
           <div className="hero-section">
             <h1 className="page-title">Frequently Asked Questions</h1>
             <p className="page-subtitle">
-              Find quick answers on our niche product guides, reviews, and how we empower your smart choices. {/* Updated: Align with mission */}
+              Unpack the mysteries of our story worlds, emotional arcs, and the raw truths of ambition. {/* Refined: From products to "story worlds," "emotional arcs," tying to draft's "mirror of life’s reality" */}
             </p>
           </div>
 
@@ -282,7 +282,7 @@ const FAQ = () => {
               href="/contact" 
               className="contact-link"
             >
-              Contact our support team {/* Unchanged: Link intact */}
+              Connect on your journey {/* Refined: From "Contact our support team" to immersive "journey" echo of draft's "chasing your own empire" */}
             </a>
           </div>
         </main>

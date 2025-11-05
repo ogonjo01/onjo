@@ -43,7 +43,7 @@ const SubscriptionPopup = ({ onClose }) => {
       try { data = await response.json(); } catch (err) {}
 
       if (response.ok) {
-        setMessage('🎉 Subscribed! Check your inbox for your first guide.');
+        setMessage('🎉 Subscribed! Check your inbox for your first chapter.');
         localStorage.setItem('subscribedAt', Date.now()); // Store subscription timestamp
         setEmail('');
         setTimeout(handleClose, 3000); // Auto-close after success
@@ -79,15 +79,15 @@ const SubscriptionPopup = ({ onClose }) => {
         </button>
 
         <div className="sp-popup-content">
-          <h2 className="sp-popup-title">Unlock Smarter Choices in Seconds</h2>
-          <p className="sp-popup-sub">Get niche product deep-dives, buying guides, and real-user insights weekly—free!</p>
+          <h2 className="sp-popup-title">Where Ambition Collides with Emotion</h2> {/* Refined Nov 05, 2025: Echo draft tagline for instant hook */}
+          <p className="sp-popup-sub">Get entrepreneurial romance novels — tales of empires, heartbreaks, and raw rebuilds — monthly, free!</p> {/* Refined: From products/guides to novels/ambition-emotion; keywords for SEO */}
 
           <ul className="sp-popup-benefits">
-            <li><Check size={16} /> Pros/cons from 500+ verified reviews</li>
-            <li><Check size={16} /> Step-by-step selection for your needs</li>
-            <li><Check size={16} /> Top picks with eco & budget options</li>
-            <li><Check size={16} /> How-tos for everyday upgrades</li>
-            <li><Check size={16} /> Tailored recs for hobbyists & pros</li>
+            <li><Check size={16} /> Heart-racing opening chapters</li> {/* Refined: From reviews to story immersion */}
+            <li><Check size={16} /> Reflections on power's fragile edge</li> {/* Refined: Draft's "what we lose," "loyalty fractures" */}
+            <li><Check size={16} /> Teasers of forbidden passions</li> {/* Refined: Draft's "business...passion" */}
+            <li><Check size={16} /> Insights into betrayal's ache</li> {/* Refined: Direct from draft's "ache of betrayal" */}
+            <li><Check size={16} /> Prompts for your own empire chase</li> {/* Refined: Ties to "hunger for greatness," "chasing dreams" */}
           </ul>
 
           <form onSubmit={submit} className="sp-popup-form">
@@ -95,13 +95,13 @@ const SubscriptionPopup = ({ onClose }) => {
               <Mail size={18} className="sp-popup-icon" />
               <input
                 type="email"
-                placeholder="you@email.com"
+                placeholder="your.empire@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
                 className="sp-popup-input"
-              />
+              /> {/* Refined: Placeholder evokes aspiration, draft's "build empires" */}
             </div>
 
             <button
@@ -109,7 +109,7 @@ const SubscriptionPopup = ({ onClose }) => {
               disabled={loading}
               className="sp-popup-submit"
             >
-              {loading ? 'Subscribing...' : 'Get Free Guides'}
+              {loading ? 'Subscribing...' : 'Awaken Your Story'} {/* Refined: From "Get Free Guides" to mission's "awaken...soul" */}
             </button>
           </form>
 
@@ -118,10 +118,10 @@ const SubscriptionPopup = ({ onClose }) => {
 
           <div className="sp-popup-testimonial">
             <Star size={16} className="sp-popup-star" />
-            <p>“Saved hours and $200 on my next gadget—game-changer!” — Alex, Shopper</p>
+            <p>“These tales scarred and rebuilt my dreams — fiction that breathes.” — Alex, Dreamer</p> {/* Refined: From gadget savings to emotional resonance; role to draft's "dreamers" */}
           </div>
 
-          <p className="sp-popup-legal">No spam • Unsubscribe anytime</p>
+          <p className="sp-popup-legal">No spoilers • Unsubscribe anytime</p> {/* Refined: Playful fiction nod, from "No spam" */}
         </div>
       </motion.div>
     </motion.div>

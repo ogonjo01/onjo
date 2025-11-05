@@ -39,7 +39,7 @@ export default function SubscriptionPage() {
       console.error('Subscription error:', err);
       setError('An error occurred. Please check your network and try again.');
     } finally {
-      setLoading(false);
+      setLoading(true);
     }
   };
 
@@ -53,20 +53,20 @@ export default function SubscriptionPage() {
           className="sp-hero"
         >
           <div className="sp-hero-left">
-            <span className="sp-pill"><Check size={14} /> Curated for everyday choosers</span> {/* Updated Oct 15, 2025: From founders to users */}
+            <span className="sp-pill"><Check size={14} /> Curated for dream-chasers</span> {/* Refined Nov 05, 2025: From choosers to draft's "dreamers" */}
 
-            <h1 className="sp-title">Niche product guides, review breakdowns — delivered weekly.</h1> {/* Updated: From books/playbooks to products/guides */}
+            <h1 className="sp-title">Novels of empire-builders and forbidden passions — delivered to awaken your soul.</h1> {/* Refined: From products to novels/ambition-emotion hook */}
 
-            <p className="sp-sub">Pros/cons insights, step-by-step how-tos, and vetted top picks — built to save you time and frustration on smart buys.</p> {/* Updated: Align with niche value */}
+            <p className="sp-sub">Heart-racing tales of entrepreneurial fire, betrayals that scar, and rebuilds that redefine victory — fiction that mirrors your deepest hungers.</p> {/* Refined: Echo draft's "hearts break," "what we lose," "feels real" */}
 
             <div className="sp-cta-row">
-              <a href="#subscribe" className="sp-cta-primary"><Mail size={16} /> Subscribe free</a> {/* Unchanged: CTA fits */}
-              <a href="#features" className="sp-cta-ghost">See what's inside</a>
+              <a href="#subscribe" className="sp-cta-primary"><Mail size={16} /> Subscribe free</a> {/* Unchanged: CTA urgency fits */}
+              <a href="#features" className="sp-cta-ghost">Explore our worlds</a> {/* Refined: From "See what's inside" to immersive tease */}
             </div>
 
             <ul className="sp-benefits">
-              <li><strong>5-minute breakdowns</strong><span>High-signal pros/cons you can action today.</span></li> {/* Updated: Shorter for reviews; actionable tie-in */}
-              <li><strong>Niche how-tos</strong><span>Shopping workflows, eco-picks, gadget tests — tips included.</span></li> {/* Updated: From playbooks to how-tos */}
+              <li><strong>Pulse-pounding previews</strong><span>Exclusive first chapters that ignite your ambition — and linger.</span></li> {/* Refined: From breakdowns to story teases; ties to "heart race" */}
+              <li><strong>Emotional reflections</strong><span>Behind-the-scenes on power plays and passion's cost — insights for your own empire.</span></li> {/* Refined: From how-tos to draft's "human side," "rebuild" */}
             </ul>
           </div>
 
@@ -79,10 +79,10 @@ export default function SubscriptionPage() {
           >
             <div className="sp-card-head">
               <div>
-                <h3 className="sp-card-title">Join 10,000+ smart shoppers</h3> {/* Updated: From builders to shoppers */}
-                <p className="sp-card-sub">Weekly newsletter + exclusive guides</p> {/* Unchanged: Fits guides */}
+                <h3 className="sp-card-title">Join 10,000+ soul-stirrers</h3> {/* Refined: From shoppers to draft's "soul remember" readers */}
+                <p className="sp-card-sub">Monthly novel drops + exclusive story worlds</p> {/* Refined: From newsletter/guides to novels/worlds */}
               </div>
-              <div className="sp-muted">No spam • Unsubscribe anytime</div>
+              <div className="sp-muted">No spoilers • Unsubscribe anytime</div> {/* Refined: Playful nod to fiction */}
             </div>
 
             <form onSubmit={submit} className="sp-form" aria-label="Subscribe form">
@@ -94,9 +94,9 @@ export default function SubscriptionPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="sp-input"
-                  placeholder="you@company.com"
+                  placeholder="you@dreams.com"
                   type="email"
-                />
+                /> {/* Refined: Placeholder evokes aspiration */}
 
                 <select
                   value={plan}
@@ -104,8 +104,8 @@ export default function SubscriptionPage() {
                   className="sp-select"
                   aria-label="Subscription tier"
                 >
-                  <option value="monthly">Weekly (free)</option>
-                  <option value="pro">Pro — $9/mo</option> {/* Unchanged: Plans fit; pro for premium guides */}
+                  <option value="monthly">Monthly Previews (free)</option> {/* Refined: From weekly to monthly for novel cadence */}
+                  <option value="pro">Premium Worlds — $9/mo</option> {/* Refined: From pro to immersive tiers */}
                 </select>
               </div>
 
@@ -117,26 +117,26 @@ export default function SubscriptionPage() {
                 disabled={loading}
                 className="sp-submit"
               >
-                {loading ? 'Subscribing…' : 'Get insights in your inbox'} {/* Unchanged: Generic CTA */}
+                {loading ? 'Subscribing…' : 'Dive into the collision'} {/* Refined: From "Get insights" to draft's "ambition and emotion" hook */}
               </button>
 
-              <p className="sp-legal">By subscribing, you agree to receive emails. We respect your privacy. Affiliates disclosed transparently.</p> {/* Updated: Add affiliate nod from About Us */}
+              <p className="sp-legal">By subscribing, you agree to receive story awakenings. We respect your privacy. <a href="https://www.onjo.life">Explore more at onjo.life</a>.</p> {/* Refined: Integrate URL; from affiliates to privacy/story focus */}
             </form>
 
             <div className="sp-grid-2">
               <div className="sp-mini"> 
                 <Star size={16} />
                 <div>
-                  <div className="mini-title">Newsletter</div> {/* Unchanged: Core */}
-                  <div className="mini-sub">Curated review takeaways</div> {/* Updated: From books to reviews */}
+                  <div className="mini-title">Novel Teasers</div> {/* Refined: From newsletter to fiction previews */}
+                  <div className="mini-sub">First looks at empires rising</div> {/* Refined: Draft's "build empires" */}
                 </div>
               </div>
 
               <div className="sp-mini">
                 <Check size={16} />
                 <div>
-                  <div className="mini-title">Guides</div> {/* Updated: From playbooks to guides */}
-                  <div className="mini-sub">Step-by-step breakdowns</div> {/* Updated: Product focus */}
+                  <div className="mini-title">Reflection Prompts</div> {/* Refined: From guides to introspective ties */}
+                  <div className="mini-sub">Questions to unpack betrayal's ache</div> {/* Refined: Draft's "ache of betrayal" */}
                 </div>
               </div>
             </div>
@@ -145,50 +145,50 @@ export default function SubscriptionPage() {
 
         <section id="features" className="sp-section">
           <h2 className="sp-h2">Why subscribe?</h2>
-          <p className="sp-p">We craft high-signal, actionable guides that strip away the hype. Expect real-review patterns, vetted alternatives, and checklists to help you choose confidently.</p> {/* Updated: From fluff/business to hype/products */}
+          <p className="sp-p">We craft fiction that bleeds truth — tales that expose the scars of success, stir your reflections, and fuel your own rebuilds.</p> {/* Refined: Direct from draft's "bleeds truth," "rebuild," "reflect" */}
 
           <div className="sp-feature-grid">
             <article className="sp-feature">
-              <h4>Actionable How-Tos</h4> {/* Updated: From templates to how-tos */}
-              <p>Pros/cons lists, shopping checklists, eco-alternatives — ready to use.</p> {/* Updated: Niche examples */}
+              <h4>Empire Teasers</h4> {/* Refined: From how-tos to thematic previews */}
+              <p>Opening chapters of boardroom seductions and whispered pacts — hooks that demand more.</p> {/* Refined: Draft's "forbidden passion," "power" */}
             </article>
 
             <article className="sp-feature">
-              <h4>Weekly Digest</h4>
-              <p>Top insights from real reviews and trends — short and structured.</p> {/* Updated: From books to reviews/trends */}
+              <h4>Monthly Muse</h4> {/* Refined: From digest to inspirational drop */}
+              <p>Curated snippets from dreamers' falls — short bursts to mirror your hungers.</p> {/* Refined: Draft's "hunger for greatness" */}
             </article>
 
             <article className="sp-feature">
-              <h4>Exclusive Deep-Dives</h4>
-              <p>Subscriber-only guides that walk you through niche picks and tests.</p> {/* Updated: Execution to picks/tests */}
+              <h4>Exclusive Echoes</h4> {/* Refined: From deep-dives to emotional extensions */}
+              <p>Subscriber-only alternate endings and author notes on heartbreak's rebuild.</p> {/* Refined: Ties to "second chances," "redefine winning" */}
             </article>
           </div>
         </section>
 
         <section className="sp-section sp-reviews">
           <div>
-            <h2 className="sp-h2">Testimonials</h2>
-            <blockquote className="sp-quote">“The weekly guides helped us upgrade our home setup without buyer's remorse—saved hours!”<cite>— Maya, Parent & Hobbyist</cite></blockquote> {/* Updated: From MRR/founder to home/products; role tie-in */}
-            <blockquote className="sp-quote">“Concise breakdowns perfect for busy pros scouting workflow tools.”<cite>— Jules, Remote Worker</cite></blockquote> {/* Updated: From PM to pro; books to tools */}
+            <h2 className="sp-h2">Reader Reflections</h2> {/* Refined: From testimonials to draft's "reflect" */}
+            <blockquote className="sp-quote">“These stories cracked open my own empire scars — raw, real, and utterly alive.”<cite>— Alex, Aspiring Founder</cite></blockquote> {/* Refined: From home setup to emotional resonance; role to draft's "dreamers" */}
+            <blockquote className="sp-quote">“The ache of betrayal hit like my boardroom losses — now I'm chasing rebuilds.”<cite>— Jordan, Entrepreneur</cite></blockquote> {/* Refined: From tools to personal ties; evokes "ache," "rebuild" */}
           </div>
 
           <div>
             <h2 className="sp-h2">FAQ</h2>
             <div className="sp-faq">
               <details>
-                <summary>Is the weekly newsletter free?</summary> {/* Unchanged: Structure fits */}
-                <div>Yes — the standard weekly digest is free. Pro plan unlocks deep-dive guides and premium checklists.</div> {/* Updated: From deep dives/templates to guides/checklists */}
+                <summary>Are the monthly previews free?</summary> {/* Refined: From weekly to monthly */}
+                <div>Yes — the standard teaser drops are free. Premium unlocks full worlds and alternate paths.</div> {/* Refined: From checklists to fiction extras */}
               </details>
 
               <details>
-                <summary>How often will I receive emails?</summary>
-                <div>Weekly digest + occasional niche trend alerts (2–4 emails/month).</div> {/* Updated: From experiments to trends */}
+                <summary>How often will I receive stories?</summary> {/* Refined: From emails to stories */}
+                <div>Monthly novel installments + occasional passion-prompt alerts (2–4 deliveries/month).</div> {/* Refined: From trends to thematic "prompts" */}
               </details>
             </div>
           </div>
         </section>
 
-        <footer className="sp-footer">© {new Date().getFullYear()} ONJO • Built for smart choosers & everyday explorers</footer> {/* Updated: Brand + tagline from "builders & founders" */}
+        <footer className="sp-footer">© {new Date().getFullYear()} ONJO • Where ambition crashes into emotion</footer> {/* Refined: Echo draft tagline */}
       </main>
     </div>
   );

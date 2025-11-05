@@ -3,14 +3,14 @@ import React from 'react';
 // Mock Header component to make the page self-contained
 const Header = () => (
   <header style={{ padding: '1rem', backgroundColor: '#34495e', color: '#fff', textAlign: 'center' }}>
-    <h1 style={{ margin: 0 }}>ONJO</h1> {/* Updated: Brand consistency from OGONJO */}
+    <h1 style={{ margin: 0 }}>ONJO</h1> {/* Unchanged: Brand consistency */}
   </header>
 );
 
 // Mock Footer component to make the page self-contained
 const Footer = () => (
   <footer style={{ padding: '2rem', backgroundColor: '#2c3e50', color: '#fff', textAlign: 'center' }}>
-    <p>© 2025 ONJO. All rights reserved.</p> {/* Updated: Brand + year alignment */}
+    <p>© 2025 ONJO. Where ambition meets emotion.</p> {/* Refined: Echo tagline for cohesion */}
   </footer>
 );
 
@@ -181,92 +181,91 @@ const About = () => {
       <Header />
       <main className="main-content">
         <section className="about-hero-section">
-          <h1 className="about-title">Empowering Everyday Choices with Niche Expertise</h1> {/* Updated Oct 14, 2025: Aligns with new mission */}
+          <h1 className="about-title">About ONJO</h1> {/* Refined: Direct from draft title */}
           <p className="about-subtitle">
-            At <strong>ONJO</strong>, we're your trusted guide through specialized products and smart decisions. {/* Updated: Brand + core promise */}
+            {/* Enhanced: Blockquote-style pull for impact; first para integrated */}
+            <em>ONJO is a storytelling brand born from the collision between ambition and emotion.</em>
           </p>
         </section>
 
         <section className="about-content-section">
           <div className="content-block">
-            <h2 className="content-heading">Our Story: From Frustration to Clarity</h2> {/* Updated: New heading from content */}
+            <h2 className="content-heading">Stories of Empires and Echoes</h2> {/* Refined: Evocative heading tying to draft */}
             <p className="content-paragraph">
-              Founded in 2024 by a team of seasoned researchers, marketers, and everyday enthusiasts, our mission is to cut through the noise of overwhelming options and deliver clear, actionable insights that save you time, money, and frustration. Whether you're a busy parent scouting durable kitchen gadgets, a hobbyist hunting the perfect eco-friendly tool, or a professional seeking reliable tech for niche workflows, we believe informed choices lead to better lives. {/* Updated: Founder story + examples */}
+              We tell stories about the dreamers who build empires—and the hearts they break along the way. Our novels dive into the worlds of business, entrepreneurship, power, and passion, revealing the human side behind success: love that fades, loyalty that fractures, and dreams that demand sacrifice. {/* Direct from draft: Core narrative */}
             </p>
             <p className="content-paragraph">
-              It started with a simple pain point. Our founder, Alex Rivera—a former product manager turned indie entrepreneur—spent endless hours sifting through generic reviews for a compact espresso maker that fit a tiny apartment kitchen. The results? Overpriced duds and vague advice that left more questions than answers. That frustration sparked ONJO: a platform dedicated to high-niche explorations, from "Pros and Cons of Ergonomic Standing Desks for Remote Coders" to "How to Choose Bike Locks That Last in Urban Chaos." {/* Updated: Personal anecdote + examples */}
-            </p>
-            <p className="content-paragraph">
-              Today, with a lean team of 8 (including SEO wizards, data analysts, and freelance writers with backgrounds from Forbes and Wired), we publish weekly deep-dives optimized for your search queries. We're globally minded, adapting insights for diverse audiences—beginners in bustling Asian cities or pros in European startups—while keeping things concise and scannable. And yes, we partner with affiliates like Amazon to keep the lights on, but transparency is non-negotiable: every recommendation is vetted for relevance, with full disclosures upfront. {/* Updated: Team size + global focus */}
+              At ONJO, we believe that ambition is not just about winning—it's about what we lose, who we become, and how we rebuild when everything falls apart. Every ONJO story is a mirror of life's reality: the hunger for greatness, the ache of betrayal, and the fragile beauty of second chances. {/* Draft para enhanced with rhythm via colons/dashes */}
             </p>
           </div>
 
           <div className="content-block values-section">
-            <h2 className="content-heading">Why Trust ONJO?</h2> {/* Updated: From "Our Values" to trust factors */}
+            <h2 className="content-heading">Our Storytelling Pillars</h2> {/* Refined: From "Why Trust" to mission echoes */}
             <ul className="values-list">
               <li>
-                <span className="value-name">Data-Driven Depth:</span> Every guide pulls from 500+ real reviews and sources like Statista or Wirecutter, cited inline for easy verification. {/* Updated: Specific to reviews/sources */}
+                <span className="value-name">Raw Ambition:</span> Narratives that capture the relentless drive of empire-builders, from boardroom battles to whispered alliances. {/* Enhanced: Ties to business/power themes */}
               </li>
               <li>
-                <span className="value-name">Audience-First Approach:</span> Tailored for real people—friendly-expert tone, no jargon, mobile-optimized for on-the-go reading. {/* Updated: User-centric */}
+                <span className="value-name">Emotional Truth:</span> Fiction that bleeds real—heartbreak, sacrifice, and rebirth—crafted for readers who crave depth over escapism. {/* Draft mission: "Feels real" amplified */}
               </li>
               <li>
-                <span className="value-name">Monetization with Integrity:</span> Subtle affiliate links only where they add value (e.g., "Get this durable option here"), always with free alternatives. {/* Updated: Transparency emphasis */}
+                <span className="value-name">Reflective Resonance:</span> Stories designed to linger, sparking your own reflections on power, passion, and the cost of chasing dreams. {/* Enhanced: From "soul remember" for introspection */}
               </li>
               <li>
-                <span className="value-name">Community Roots:</span> We're active on X (formerly Twitter) and Reddit, crowdsourcing feedback to refine our content. Join the conversation @NicheWiseHub. {/* Updated: Social tie-in */}
+                <span className="value-name">Inclusive Worlds:</span> Diverse voices in entrepreneurial romance, building communities where ambition meets vulnerability. {/* New: Adds inclusivity nod; ties to social/follow */}
               </li>
             </ul>
           </div>
 
           <div className="content-block team-section">
-            <h2 className="content-heading">Meet Our Team</h2> {/* Unchanged: Heading fits */}
+            <h2 className="content-heading">The Dreamers Behind the Words</h2> {/* Refined: From "Meet Our Team" to creative fit */}
             <div className="team-grid">
               <div className="team-member">
                 <img 
-                  src="https://placehold.co/200x200/cccccc/333333?text=Alex+Rivera"  /* Updated: Founder name in placeholder */
-                  alt="Alex Rivera, Founder"  /* Updated: Descriptive alt */
-                />
-                <h3 className="member-name">Alex Rivera</h3> {/* Updated: From John Doe */}
-                <p className="member-role">Founder & Product Lead</p> {/* Updated: Role to match story */}
-                <p className="member-bio">Former product manager turned indie entrepreneur, passionate about turning review chaos into clarity for everyday choices.</p> {/* Updated: Bio alignment */}
-              </div>
-              <div className="team-member">
-                <img 
-                  src="https://placehold.co/200x200/cccccc/333333?text=Team+Member"  /* Updated: Generic for team of 8 */
-                  alt="Content Specialist" 
+                  src="https://placehold.co/200x200/cccccc/333333?text=Alex+Rivera"  /* Unchanged: Reuse; suggest author photo later */
+                  alt="Alex Rivera, Founder & Storyteller"  /* Refined: Role update */
                   className="team-photo"
                 />
-                <h3 className="member-name">Sarah Kim</h3> {/* Updated: Diverse name example */}
-                <p className="member-role">Head of Content & Research</p> {/* Updated: Role */}
-                <p className="member-bio">SEO wizard and freelance writer from Wired, dedicated to crafting scannable deep-dives on niche gadgets and tools.</p> {/* Updated: Background tie-in */}
+                <h3 className="member-name">Alex Rivera</h3>
+                <p className="member-role">Founder & Lead Storyteller</p> {/* Refined: Creative pivot */}
+                <p className="member-bio">A former entrepreneur whose own empire crumbled under passion's weight—inspiring novels that turn personal scars into shared triumphs.</p> {/* Enhanced: Echoes draft's loss/rebuild */}
               </div>
-              {/* Optional: Add third for team nod—grid handles it */}
               <div className="team-member">
                 <img 
-                  src="https://placehold.co/200x200/cccccc/333333?text=Data+Analyst" 
-                  alt="Data Analyst" 
+                  src="https://placehold.co/200x200/cccccc/333333?text=Sarah+Kim" 
+                  alt="Sarah Kim, Editor" 
+                  className="team-photo"
+                />
+                <h3 className="member-name">Sarah Kim</h3>
+                <p className="member-role">Editor & Narrative Architect</p> {/* Refined: From content head */}
+                <p className="member-bio">Wordsmith with a knack for weaving betrayal's ache into pulse-racing plots, drawing from indie publishing roots to amplify underrepresented dreamers.</p> {/* Enhanced: Ties to emotion/authenticity */}
+              </div>
+              {/* Optional: Third for balance—adapt as needed */}
+              <div className="team-member">
+                <img 
+                  src="https://placehold.co/200x200/cccccc/333333?text=Raj+Patel" 
+                  alt="Raj Patel, Illustrator" 
                   className="team-photo"
                 />
                 <h3 className="member-name">Raj Patel</h3>
-                <p className="member-role">Data Analyst</p>
-                <p className="member-bio">Cruncher of Amazon/Reddit data, ensuring our insights are backed by real trends and user patterns.</p>
+                <p className="member-role">Cover Artist & Visionary</p> {/* Refined: Visual storytelling */}
+                <p className="member-bio">Captures the fragile edge of ambition in evocative designs, blending cultural motifs with the raw pulse of entrepreneurial worlds.</p>
               </div>
             </div>
           </div>
 
-          {/* New: Added section for forward-looking content—fits pattern without structure change */}
+          {/* Refined: Forward section as narrative close—preserves pattern */}
           <div className="content-block">
-            <h2 className="content-heading">Looking Ahead: Building a Smarter Shopping World</h2> {/* Updated: New heading */}
+            <h2 className="content-heading">Where Ambition Meets Emotion</h2> {/* Refined: Tagline as heading */}
             <p className="content-paragraph">
-              As we grow into 2026, we're expanding with interactive tools—like customizable product quizzes and PDF downloadables for offline reference—while committing to sustainability: 10% of affiliate earnings support eco-initiatives tied to our green product guides. ONJO isn't just about products; it's about empowering you to choose wisely, live fully, and shop sustainably. {/* Updated: Vision + CTA setup */}
+              Our mission is to write fiction that feels real—stories that make your heart race, your mind reflect, and your soul remember what it means to feel alive. As we launch our debut novels in 2026, join us in exploring these worlds: from startup seductions to legacy reckonings. {/* Draft mission + teaser enhancement */}
             </p>
             <p className="content-paragraph">
-              Ready to dive in? <a href="/">Explore Our Guides</a> or download a free starter PDF on "Top Niche Hacks for 2025." Have a topic suggestion? Drop us a line at hello@onjo.com—we're all ears. {/* Updated: CTAs + email; add real PDF link later */}
+              Ready to dive deeper? <a href="/">Discover Our Stories</a> or follow the journey on <a href="https://www.onjo.life">www.onjo.life</a>. Share your own empire tale at hello@onjo.life—we're building this together. {/* Enhanced: CTAs with URL; community hook */}
             </p>
-            <p className="content-paragraph" style={{ fontSize: '0.9rem', color: '#7f8c8d', textAlign: 'center' }}> {/* Inline style for note—minimal */}
-              *Last updated: October 14, 2025*  
-              *Your Site Author: The ONJO Team* {/* Updated: Date + author */}
+            <p className="content-paragraph" style={{ fontSize: '0.9rem', color: '#7f8c8d', textAlign: 'center' }}>
+              *Last updated: November 04, 2025*  
+              *Your Storytellers: The ONJO Collective* {/* Refined: Date + author nod to team */}
             </p>
           </div>
         </section>

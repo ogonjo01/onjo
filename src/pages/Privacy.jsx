@@ -4,7 +4,7 @@ import React from 'react';
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO</h1> {/* Updated Oct 15, 2025: Brand consistency */}
+      <h1 className="header-title">ONJO</h1> {/* Unchanged: Brand consistency */}
     </div>
   </header>
 );
@@ -13,7 +13,7 @@ const Header = () => (
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Updated: Brand alignment */}
+      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Unchanged: Brand alignment */}
     </div>
   </footer>
 );
@@ -154,7 +154,7 @@ const Privacy = () => {
           <div className="hero-section">
             <h1 className="page-title">Privacy Policy</h1>
             <p className="last-updated">
-              Last updated: October 15, 2025 {/* Updated: Current date */}
+              Last updated: November 05, 2025 {/* Refined: Current date */}
             </p>
           </div>
 
@@ -165,7 +165,7 @@ const Privacy = () => {
                   Information We Collect {/* Unchanged: Standard privacy */}
                 </h2>
                 <p className="section-text">
-                  We collect information you provide when you interact with our platform. This may include your email address if you choose to sign up for updates or save preferences. We also collect usage data such as pages viewed, product guides and reviews accessed, and interactions within the platform, along with device information and IP addresses for analytics and to ensure platform stability. {/* Updated: From books to product guides/reviews */}
+                  We collect information you provide when you interact with our platform. This may include your email address if you choose to sign up for updates or save preferences. We also collect usage data such as pages viewed, stories and novels accessed, and interactions within the platform, along with device information and IP addresses for analytics and to ensure platform stability. {/* Refined: From product guides/reviews to stories/novels—aligns with storytelling mission */}
                 </p>
               </div>
 
@@ -178,8 +178,8 @@ const Privacy = () => {
                 </p>
                 <ul className="list">
                   <li className="list-item">Provide and maintain the platform.</li>
-                  <li className="list-item">Analyze usage patterns to improve the quality and relevance of our product guides and reviews.</li> {/* Updated: To products/guides */}
-                  <li className="list-item">Personalize your experience (e.g., suggesting relevant niche products you might like).</li> {/* Updated: From books to niche products */}
+                  <li className="list-item">Analyze usage patterns to improve the quality and relevance of our stories and novels.</li> {/* Refined: To stories/novels for narrative focus */}
+                  <li className="list-item">Personalize your experience (e.g., suggesting relevant themes or worlds you might crave).</li> {/* Refined: From niche products to thematic "worlds" evoking draft's immersive fiction */}
                   <li className="list-item">Communicate with you regarding service updates or other important information.</li>
                 </ul>
                 <p className="section-text">
@@ -201,7 +201,7 @@ const Privacy = () => {
                   Third-Party Services
                 </h2>
                 <p className="section-text">
-                  As a free service, we may use third-party services to support our operations, such as for hosting and analytics. These providers may collect data according to their own privacy policies. For example, we use analytics tools to understand platform usage and traffic sources. We encourage you to review their policies. We do not share your personal data with third parties beyond what is necessary to operate and analyze our service. {/* Updated: Minor—ties to affiliate transparency from About Us */}
+                  As a free service, we may use third-party services to support our operations, such as for hosting and analytics. These providers may collect data according to their own privacy policies. For example, we use analytics tools to understand platform usage and traffic sources. We encourage you to review their policies. We do not share your personal data with third parties beyond what is necessary to operate and analyze our service. {/* Unchanged: Ties to transparency, no major pivot needed for storytelling */}
                 </p>
               </div>
               
@@ -210,7 +210,7 @@ const Privacy = () => {
                   Your Privacy Rights
                 </h2>
                 <p className="section-text">
-                  Depending on your location, you may have specific rights regarding your personal data. These can include the right to access, correct, or delete your data, and the right to object to or restrict its processing. To exercise these rights or for any privacy concerns, please contact us at privacy@onjo.com. We will respond to all requests in accordance with applicable law. {/* Updated: Email to match brand */}
+                  Depending on your location, you may have specific rights regarding your personal data. These can include the right to access, correct, or delete your data, and the right to object to or restrict its processing. To exercise these rights or for any privacy concerns, please contact us at privacy@onjo.life. We will respond to all requests in accordance with applicable law. {/* Refined: Email to match brand URL from narrative */}
                 </p>
               </div>
             </CardContent>
