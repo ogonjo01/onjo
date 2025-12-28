@@ -1,10 +1,10 @@
 :root{
-  --accent-1: #0fd1a3;
-  --accent-2: #163444;
+  --accent-1: #8ecee6;
+  --accent-2: #36a761;
   --bg: #ffffff;
-  --muted: #6b7280;
+  --muted: #2c68e1;
   --header-height: 64px;
-  --shadow: 0 6px 22px rgba(12,18,26,0.06);
+  --shadow: 0 6px 22px rgba(61, 123, 205, 0.06);
 }
 
 /* fixed header */

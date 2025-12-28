@@ -5,7 +5,7 @@ import './SubscriptionPage.css';
 
 export default function SubscriptionPage() {
   const [email, setEmail] = useState("");
-  const [plan, setPlan] = useState("monthly");
+  const [plan, setPlan] = useState("monthly"); // monthly = free, pro = paid (Gumroad)
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -14,10 +14,41 @@ export default function SubscriptionPage() {
     e.preventDefault();
     setMessage(null);
     setError(null);
+
     if (!email || email.indexOf('@') === -1) {
       setError('Please enter a valid email address.');
       return;
     }
+
+    // If user selected the paid plan, redirect to Gumroad storefront (open in new tab)
+    if (plan === 'pro') {
+      setLoading(true);
+      try {
+        // Base Gumroad profile URL provided by you
+        let gumroadUrl = 'https://onjotech.gumroad.com/';
+
+        // Add email prefill if available (Gumroad supports checkout[email]=... on product pages).
+        // For profile root it may not prefill; if you have a direct product link (like /l/your-product),
+        // replace gumroadUrl with that product checkout URL to allow prefill.
+        if (email) {
+          const sep = gumroadUrl.includes('?') ? '&' : '?';
+          gumroadUrl = `${gumroadUrl}${sep}checkout[email]=${encodeURIComponent(email)}`;
+        }
+
+        // Open Gumroad in a new tab/window
+        window.open(gumroadUrl, '_blank', 'noopener,noreferrer');
+
+        setMessage('Redirecting to Gumroad for purchase...');
+      } catch (err) {
+        console.error('Gumroad redirect error:', err);
+        setError('Unable to open Gumroad. Please try again or visit https://onjotech.gumroad.com/');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Free plan: continue with existing backend subscribe flow
     setLoading(true);
     try {
       const response = await fetch('https://ogonjo-idea-vault1-production.up.railway.app/subscribe', {
@@ -30,7 +61,7 @@ export default function SubscriptionPage() {
       try { data = await response.json(); } catch (err) { /* ignore non-json */ }
 
       if (response.ok) {
-        setMessage('🎉 You are all set! Check your inbox to confirm.');
+        setMessage('🎉 You are subscribed! Check your inbox for confirmation.');
         setEmail('');
       } else {
         setError('Oops! ' + (data && data.message ? data.message : 'Something went wrong. Please try again.'));
@@ -39,7 +70,7 @@ export default function SubscriptionPage() {
       console.error('Subscription error:', err);
       setError('An error occurred. Please check your network and try again.');
     } finally {
-      setLoading(true);
+      setLoading(false);
     }
   };
 
@@ -53,20 +84,22 @@ export default function SubscriptionPage() {
           className="sp-hero"
         >
           <div className="sp-hero-left">
-            <span className="sp-pill"><Check size={14} /> Curated for dream-chasers</span> {/* Refined Nov 05, 2025: From choosers to draft's "dreamers" */}
+            <span className="sp-pill"><Check size={14} /> Curated for tech enthusiasts</span>
 
-            <h1 className="sp-title">Novels of empire-builders and forbidden passions — delivered to awaken your soul.</h1> {/* Refined: From products to novels/ambition-emotion hook */}
+            <h1 className="sp-title">Stay Ahead in Programming, Cybersecurity & Electronics</h1>
 
-            <p className="sp-sub">Heart-racing tales of entrepreneurial fire, betrayals that scar, and rebuilds that redefine victory — fiction that mirrors your deepest hungers.</p> {/* Refined: Echo draft's "hearts break," "what we lose," "feels real" */}
+            <p className="sp-sub">
+              Weekly tips, tutorials, and test-driven challenges to sharpen your tech skills and stay current with industry trends.
+            </p>
 
             <div className="sp-cta-row">
-              <a href="#subscribe" className="sp-cta-primary"><Mail size={16} /> Subscribe free</a> {/* Unchanged: CTA urgency fits */}
-              <a href="#features" className="sp-cta-ghost">Explore our worlds</a> {/* Refined: From "See what's inside" to immersive tease */}
+              <a href="#subscribe" className="sp-cta-primary"><Mail size={16} /> Subscribe Free</a>
+              <a href="#features" className="sp-cta-ghost">Explore Topics</a>
             </div>
 
             <ul className="sp-benefits">
-              <li><strong>Pulse-pounding previews</strong><span>Exclusive first chapters that ignite your ambition — and linger.</span></li> {/* Refined: From breakdowns to story teases; ties to "heart race" */}
-              <li><strong>Emotional reflections</strong><span>Behind-the-scenes on power plays and passion's cost — insights for your own empire.</span></li> {/* Refined: From how-tos to draft's "human side," "rebuild" */}
+              <li><strong>Hands-on Tutorials</strong><span>Practical coding, electronics, and telecom exercises for real-world experience.</span></li>
+              <li><strong>Expert Insights</strong><span>Tips from cybersecurity specialists, software engineers, and tech innovators.</span></li>
             </ul>
           </div>
 
@@ -79,10 +112,10 @@ export default function SubscriptionPage() {
           >
             <div className="sp-card-head">
               <div>
-                <h3 className="sp-card-title">Join 10,000+ soul-stirrers</h3> {/* Refined: From shoppers to draft's "soul remember" readers */}
-                <p className="sp-card-sub">Monthly novel drops + exclusive story worlds</p> {/* Refined: From newsletter/guides to novels/worlds */}
+                <h3 className="sp-card-title">Join 10,000+ Tech Learners</h3>
+                <p className="sp-card-sub">Weekly tutorials + challenges in programming, cybersecurity, and electronics</p>
               </div>
-              <div className="sp-muted">No spoilers • Unsubscribe anytime</div> {/* Refined: Playful nod to fiction */}
+              <div className="sp-muted">No spam • Unsubscribe anytime</div>
             </div>
 
             <form onSubmit={submit} className="sp-form" aria-label="Subscribe form">
@@ -94,9 +127,9 @@ export default function SubscriptionPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="sp-input"
-                  placeholder="you@dreams.com"
+                  placeholder="you@techmail.com"
                   type="email"
-                /> {/* Refined: Placeholder evokes aspiration */}
+                />
 
                 <select
                   value={plan}
@@ -104,8 +137,8 @@ export default function SubscriptionPage() {
                   className="sp-select"
                   aria-label="Subscription tier"
                 >
-                  <option value="monthly">Monthly Previews (free)</option> {/* Refined: From weekly to monthly for novel cadence */}
-                  <option value="pro">Premium Worlds — $9/mo</option> {/* Refined: From pro to immersive tiers */}
+                  <option value="monthly">Monthly Updates (Free)</option>
+                  <option value="pro">Premium Challenges — Purchase on Gumroad</option>
                 </select>
               </div>
 
@@ -117,26 +150,26 @@ export default function SubscriptionPage() {
                 disabled={loading}
                 className="sp-submit"
               >
-                {loading ? 'Subscribing…' : 'Dive into the collision'} {/* Refined: From "Get insights" to draft's "ambition and emotion" hook */}
+                {loading ? 'Processing…' : plan === 'pro' ? 'Buy on Gumroad' : 'Join the Lab'}
               </button>
 
-              <p className="sp-legal">By subscribing, you agree to receive story awakenings. We respect your privacy. <a href="https://www.onjo.life">Explore more at onjo.life</a>.</p> {/* Refined: Integrate URL; from affiliates to privacy/story focus */}
+              <p className="sp-legal">By subscribing, you agree to receive tech updates and challenges. We respect your privacy. <a href="https://www.onjo.life">Learn more at onjo.life</a>.</p>
             </form>
 
             <div className="sp-grid-2">
-              <div className="sp-mini"> 
+              <div className="sp-mini">
                 <Star size={16} />
                 <div>
-                  <div className="mini-title">Novel Teasers</div> {/* Refined: From newsletter to fiction previews */}
-                  <div className="mini-sub">First looks at empires rising</div> {/* Refined: Draft's "build empires" */}
+                  <div className="mini-title">Code Snippets</div>
+                  <div className="mini-sub">Reusable examples to accelerate learning</div>
                 </div>
               </div>
 
               <div className="sp-mini">
                 <Check size={16} />
                 <div>
-                  <div className="mini-title">Reflection Prompts</div> {/* Refined: From guides to introspective ties */}
-                  <div className="mini-sub">Questions to unpack betrayal's ache</div> {/* Refined: Draft's "ache of betrayal" */}
+                  <div className="mini-title">Practice Challenges</div>
+                  <div className="mini-sub">Test your skills in real-world scenarios</div>
                 </div>
               </div>
             </div>
@@ -144,51 +177,53 @@ export default function SubscriptionPage() {
         </motion.header>
 
         <section id="features" className="sp-section">
-          <h2 className="sp-h2">Why subscribe?</h2>
-          <p className="sp-p">We craft fiction that bleeds truth — tales that expose the scars of success, stir your reflections, and fuel your own rebuilds.</p> {/* Refined: Direct from draft's "bleeds truth," "rebuild," "reflect" */}
+          <h2 className="sp-h2">Why Subscribe?</h2>
+          <p className="sp-p">
+            Gain hands-on experience in programming, cybersecurity, electronics, and telecommunications with curated tutorials and challenges.
+          </p>
 
           <div className="sp-feature-grid">
             <article className="sp-feature">
-              <h4>Empire Teasers</h4> {/* Refined: From how-tos to thematic previews */}
-              <p>Opening chapters of boardroom seductions and whispered pacts — hooks that demand more.</p> {/* Refined: Draft's "forbidden passion," "power" */}
+              <h4>Programming Tutorials</h4>
+              <p>Step-by-step exercises in Python, JavaScript, C++, and more for practical skill-building.</p>
             </article>
 
             <article className="sp-feature">
-              <h4>Monthly Muse</h4> {/* Refined: From digest to inspirational drop */}
-              <p>Curated snippets from dreamers' falls — short bursts to mirror your hungers.</p> {/* Refined: Draft's "hunger for greatness" */}
+              <h4>Cybersecurity Tips</h4>
+              <p>Learn ethical hacking, network security, and best practices for protecting systems.</p>
             </article>
 
             <article className="sp-feature">
-              <h4>Exclusive Echoes</h4> {/* Refined: From deep-dives to emotional extensions */}
-              <p>Subscriber-only alternate endings and author notes on heartbreak's rebuild.</p> {/* Refined: Ties to "second chances," "redefine winning" */}
+              <h4>Electronics & Telecom</h4>
+              <p>Projects and labs to understand circuits, IoT, and telecommunications fundamentals.</p>
             </article>
           </div>
         </section>
 
         <section className="sp-section sp-reviews">
           <div>
-            <h2 className="sp-h2">Reader Reflections</h2> {/* Refined: From testimonials to draft's "reflect" */}
-            <blockquote className="sp-quote">“These stories cracked open my own empire scars — raw, real, and utterly alive.”<cite>— Alex, Aspiring Founder</cite></blockquote> {/* Refined: From home setup to emotional resonance; role to draft's "dreamers" */}
-            <blockquote className="sp-quote">“The ache of betrayal hit like my boardroom losses — now I'm chasing rebuilds.”<cite>— Jordan, Entrepreneur</cite></blockquote> {/* Refined: From tools to personal ties; evokes "ache," "rebuild" */}
+            <h2 className="sp-h2">Learner Feedback</h2>
+            <blockquote className="sp-quote">“The coding exercises really sharpened my skills and helped me ace technical interviews.”<cite>— Alex, Developer</cite></blockquote>
+            <blockquote className="sp-quote">“Cybersecurity labs are practical and very insightful. Highly recommended!”<cite>— Jordan, Security Analyst</cite></blockquote>
           </div>
 
           <div>
             <h2 className="sp-h2">FAQ</h2>
             <div className="sp-faq">
               <details>
-                <summary>Are the monthly previews free?</summary> {/* Refined: From weekly to monthly */}
-                <div>Yes — the standard teaser drops are free. Premium unlocks full worlds and alternate paths.</div> {/* Refined: From checklists to fiction extras */}
+                <summary>Are the updates free?</summary>
+                <div>Yes — basic tutorials and practice challenges are free. Premium subscription unlocks advanced labs.</div>
               </details>
 
               <details>
-                <summary>How often will I receive stories?</summary> {/* Refined: From emails to stories */}
-                <div>Monthly novel installments + occasional passion-prompt alerts (2–4 deliveries/month).</div> {/* Refined: From trends to thematic "prompts" */}
+                <summary>How often will I receive updates?</summary>
+                <div>Weekly emails with tutorials, exercises, and tech insights.</div>
               </details>
             </div>
           </div>
         </section>
 
-        <footer className="sp-footer">© {new Date().getFullYear()} ONJO • Where ambition crashes into emotion</footer> {/* Refined: Echo draft tagline */}
+        <footer className="sp-footer">© {new Date().getFullYear()} ONJO • Tech Learning & Challenges</footer>
       </main>
     </div>
   );

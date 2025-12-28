@@ -1,19 +1,19 @@
 import React from 'react';
 
-// Mock Header component to keep all code in a single file
+// Mock Header component
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO</h1> {/* Unchanged: Brand consistency */}
+      <h1 className="header-title">ONJO TECH</h1>
     </div>
   </header>
 );
 
-// Mock Footer component to keep all code in a single file
+// Mock Footer component
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Unchanged: Brand alignment */}
+      <p>&copy; {new Date().getFullYear()} ONJO TECH. All rights reserved.</p>
     </div>
   </footer>
 );
@@ -28,10 +28,10 @@ const Terms = () => {
         body {
           margin: 0;
           font-family: 'Roboto', sans-serif;
-          background-color: #f0f4f8; /* Light gray background */
-          color: #1a202c; /* Dark text for readability */
+          background-color: #f0f4f8;
+          color: #1a202c;
         }
-        
+
         .header {
           background-color: #ffffff;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -126,60 +126,61 @@ const Terms = () => {
         }
         `}
       </style>
+
       <div className="flex flex-col min-h-screen">
         <Header />
         <main className="main-content">
           <div className="hero-section">
             <h1 className="page-title">Terms of Service</h1>
-            <p className="last-updated">Last updated: November 04, 2025</p> {/* Refined: Current date */}
+            <p className="last-updated">Last updated: December 28, 2025</p>
           </div>
-          
+
           <div className="content-card">
             <div className="section">
-              <h2 className="section-title">Introduction</h2> {/* Unchanged: Standard legal */}
+              <h2 className="section-title">Introduction</h2>
               <p className="section-content">
-                Welcome to ONJO, a storytelling brand crafting novels that explore the collision of ambition and emotion. By accessing or using our Service, you agree to be bound by these Terms of Service ("Terms"). If you do not agree with any part of these Terms, you may not use our Service. {/* Refined: From products to storytelling/novels; echoes About hook */}
+                Welcome to ONJO TECH, a platform providing educational content in technology, programming, AI, cybersecurity, and telecommunications. By accessing or using our Service, you agree to be bound by these Terms of Service ("Terms"). If you do not agree with any part of these Terms, you may not use our Service.
               </p>
             </div>
-            
+
             <div className="section">
               <h2 className="section-title">1. Intellectual Property & Content</h2>
               <p className="section-content">
-                All content on the Service, including novels, stories, text, graphics, and logos, is our property or the property of our content suppliers and is protected by copyright and intellectual property laws. The stories and narratives are intended for personal, inspirational use only. You may not reproduce, distribute, modify, or create derivative works from our content without our explicit written permission. {/* Refined: To novels/stories/narratives; ties to "inspirational" mission */}
+                All content on the Service, including tutorials, guides, graphics, and logos, is our property or the property of our content suppliers and is protected by copyright and intellectual property laws. The materials are intended for personal educational use only. You may not reproduce, distribute, modify, or create derivative works from our content without our explicit written permission.
               </p>
             </div>
-            
+
             <div className="section">
               <h2 className="section-title">2. Disclaimers and Limitation of Liability</h2>
               <p className="section-content">
-                The Service is provided on an "as is" and "as available" basis. We do not make any warranties, express or implied, regarding the accuracy, reliability, or completeness of the stories and narratives. The insights provided are not a substitute for professional advice on ambition, relationships, or personal growth. We are not liable for any decisions made based on the reflections from our Service. {/* Refined: From products/shopping to stories/narratives; adapts to emotional themes */}
+                The Service is provided on an "as is" and "as available" basis. We do not make any warranties, express or implied, regarding the accuracy, reliability, or completeness of the content. The materials are for educational purposes only and do not substitute for professional advice. We are not liable for any decisions made based on content from our Service.
               </p>
             </div>
-            
+
             <div className="section">
               <h2 className="section-title">3. Prohibited Use</h2>
               <p className="section-content">
-                You agree not to use the Service for any unlawful or prohibited purpose. This includes, but is not limited to:
+                You agree not to use the Service for any unlawful or prohibited purpose, including but not limited to:
               </p>
               <ul className="list">
-                <li>Copying, distributing, or reselling the novels, stories, or content from our website.</li> {/* Refined: To novels/stories */}
+                <li>Copying, distributing, or reselling the educational content.</li>
                 <li>Attempting to gain unauthorized access to our systems.</li>
-                <li>Using any automated means (e.g., bots, scrapers) to collect or access our content or links.</li> {/* Minor: Generalize from affiliates */}
-                <li>Using the Service in any way that could harm, disable, or overburden our website or servers.</li>
+                <li>Using automated means (e.g., bots, scrapers) to collect content or data.</li>
+                <li>Using the Service in any way that could harm or overload our servers.</li>
               </ul>
             </div>
-            
+
             <div className="section">
               <h2 className="section-title">4. Changes to the Terms</h2>
               <p className="section-content">
-                We reserve the right to modify these Terms at any time. We will post the updated Terms on this page. Your continued use of the Service after any changes constitutes your acceptance of the new Terms. {/* Unchanged: Boilerplate */}
+                We reserve the right to modify these Terms at any time. Updated Terms will be posted on this page. Your continued use of the Service after changes constitutes acceptance of the new Terms.
               </p>
             </div>
-            
+
             <div className="section">
               <h2 className="section-title">5. Governing Law</h2>
               <p className="section-content">
-                These Terms are governed by the laws of the United States, without regard to its conflict of law provisions. Any legal action related to these Terms will be brought in the courts of the United States. {/* Unchanged: Legal standard */}
+                These Terms are governed by the laws of the United States, without regard to its conflict of law provisions. Any legal action related to these Terms will be brought in the courts of the United States.
               </p>
             </div>
           </div>

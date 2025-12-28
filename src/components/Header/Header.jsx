@@ -66,8 +66,8 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
             ☰
           </button>
           <Link to="/" className="og-logo" aria-label="Home">
-            <div className="og-logo-mark">O</div>
-            <div className="og-logo-text">ONJO</div> {/* Unchanged: Core brand */}
+            <div className="og-logo-mark">OT</div>
+            <div className="og-logo-text">ONJO Tech</div>
           </Link>
         </div>
 
@@ -75,8 +75,8 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search stories, empires, or passions..." /* Refined Nov 04, 2025: From guides/products to storytelling themes—evokes draft's ambition/emotion */
-            aria-label="Search stories" /* Refined: Accessibility for narrative discovery */
+            placeholder="Search tech topics..."
+            aria-label="Search topics"
             autoComplete="off"
             className="search-input"
           />
@@ -98,26 +98,32 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
               <>
                 <button className="profile-button" onClick={() => setShowProfileModal(true)}>
                   <span className="letter-avatar">{avatarLetter}</span>
-                  <span className="profile-name">{profile?.username || "Your Story"}</span> {/* Refined: From "Profile" to subtle narrative nod */}
+                  <span className="profile-name">{profile?.username || "Your Profile"}</span>
                 </button>
                 <button className="logout-button" onClick={handleSignOut}>Sign Out</button>
 
-                {/* Only show Add Summary if user can_add_summary is true */}
                 {profile?.can_add_summary && (
                   <button className="create-button" onClick={onAddClick}>
-                    + Share Tale {/* Refined: From "Add Guide" to "Share Tale"—ties to mission of real-fiction sharing */}
+                    + Share Project
                   </button>
                 )}
               </>
             ) : (
               <Link to="/auth" className="sign-in-link">
-                Enter the World
-                {/* Refined Nov 04, 2025: From "Sign In" to immersive CTA evoking story worlds */}
+                Enter the Lab
               </Link>
             )}
-            <Link to="/subscribe" className="subscribe-button">
-              Join the Journey
-              {/* Refined Nov 04, 2025: From "Subscribe" to emotional echo of draft's "chasing dreams" */}
+
+            {/* Gumroad subscription button */}
+            <Link
+              to="#"
+              onClick={(e) => {
+                e.preventDefault();
+                window.open("https://onjotech.gumroad.com/", "_blank", "noopener,noreferrer");
+              }}
+              className="subscribe-button"
+            >
+              Join the Lab
             </Link>
           </div>
         </div>
@@ -131,24 +137,31 @@ const Header = ({ session, onAddClick, onSearch, isHomePage, isHidden }) => {
             {session ? (
               <>
                 <button onClick={() => { setShowProfileModal(true); setMenuOpen(false); }}>
-                  Your Story {/* Refined: Consistent with desktop */}
+                  Your Profile
                 </button>
                 <button onClick={() => { handleSignOut(); setMenuOpen(false); }}>Sign Out</button>
 
                 {profile?.can_add_summary && (
                   <button onClick={() => { onAddClick(); setMenuOpen(false); }}>
-                    + Share Tale {/* Refined: Mirror desktop for cohesion */}
+                    + Share Project
                   </button>
                 )}
               </>
             ) : (
               <Link to="/auth" onClick={() => setMenuOpen(false)}>
-                Enter the World {/* Refined: Consistent CTA */}
+                Enter the Lab
               </Link>
             )}
 
-            <Link to="/subscribe" onClick={() => setMenuOpen(false)}>
-              Join the Journey {/* Refined: Mobile match */}
+            <Link
+              to="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setMenuOpen(false);
+                window.open("https://onjotech.gumroad.com/", "_blank", "noopener,noreferrer");
+              }}
+            >
+              Join the Lab
             </Link>
           </div>
           <div className="overlay" onClick={() => setMenuOpen(false)} />

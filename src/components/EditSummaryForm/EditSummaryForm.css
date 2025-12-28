@@ -1,27 +1,37 @@
+/* Overlay: fixed, full-screen, and very high z-index so it sits above any app stacking context */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0; /* top:0; right:0; bottom:0; left:0; */
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  /* make sure nothing beats this z-index */
+  z-index: 2147483647 !important;
+  pointer-events: auto;
 }
 
+/* Modal container - slightly larger max-width to avoid overflow issues on wide screens */
 .modal-content {
-  background: white;
+  background: #fff;
   padding: 30px;
   border-radius: 8px;
-  max-width: 600px;
-  width: 90%;
+  max-width: 900px;
+  width: 94%;
   position: relative;
-  max-height: 90vh;
+  max-height: 92vh;
   overflow-y: auto;
+  /* ensure modal content is above overlay where needed */
+  z-index: 2147483648 !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
 }
 
+/* Optional bigger variant you had */
+.modal-content.edit-large {
+  max-width: 1100px;
+}
+
+/* Close button */
 .close-button {
   position: absolute;
   top: 10px;
@@ -30,9 +40,11 @@
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  color: #888;
+  color: #666;
+  z-index: 2147483649;
 }
 
+/* Form layout */
 .summary-form {
   display: flex;
   flex-direction: column;
@@ -41,7 +53,7 @@
 
 .summary-form label {
   font-weight: bold;
-  color: #555;
+  color: #333;
 }
 
 .summary-form input,
@@ -49,10 +61,11 @@
 .summary-form select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid #d0d0d0;
   border-radius: 4px;
   box-sizing: border-box;
   font-size: 1rem;
+  background: #fff;
 }
 
 .summary-form button {
@@ -64,14 +77,56 @@
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: background-color 0.2s;
 }
 
 .summary-form button:disabled {
-  background-color: #a0a0a0;
+  background-color: #9aa5b1;
   cursor: not-allowed;
 }
 
 .summary-form button:hover:not(:disabled) {
   background-color: #0056b3;
+}
+
+/* Quill container adjustments so popovers/toolbar sit inside modal */
+.quill-container {
+  background: #fff;
+}
+
+/* Make sure quill toolbar is positioned over the modal content (rarely needed but safe) */
+.ql-toolbar {
+  z-index: 2147483650 !important;
+}
+
+/* Tags */
+.tags-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tags-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tag-chip {
+  background: #f1f1f1;
+  border: 1px solid #e0e0e0;
+  padding: 6px 8px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+/* Error */
+.form-error {
+  color: #b00020;
+  font-weight: 600;
+}
+
+/* YouTube iframe preview */
+.youtube-preview {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
 }

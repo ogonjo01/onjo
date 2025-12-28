@@ -4,21 +4,21 @@ import React from 'react';
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO</h1> {/* Unchanged: Brand consistency */}
+      <h1 className="header-title">ONJO</h1> {/* Brand consistency */}
     </div>
   </header>
 );
 
-// Mock Footer component to keep all code in a single file
+// Mock Footer component
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p> {/* Unchanged: Brand alignment */}
+      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p>
     </div>
   </footer>
 );
 
-// Mock components to keep the app self-contained and runnable
+// Mock card components
 const Card = ({ children }) => <div className="card">{children}</div>;
 const CardContent = ({ children }) => <div className="card-content">{children}</div>;
 
@@ -40,12 +40,11 @@ const Privacy = () => {
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            background-color: #f8f9fa;
           }
           
           .header {
             background-color: #ffffff;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             padding: 1rem 0;
           }
 
@@ -93,7 +92,7 @@ const Privacy = () => {
             margin: 0 auto;
             background-color: #ffffff;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             overflow: hidden;
           }
 
@@ -147,70 +146,59 @@ const Privacy = () => {
           }
         `}
       </style>
+
       <div className="privacy-page-container">
         <Header />
-        
+
         <main className="main-content">
           <div className="hero-section">
             <h1 className="page-title">Privacy Policy</h1>
-            <p className="last-updated">
-              Last updated: November 05, 2025 {/* Refined: Current date */}
-            </p>
+            <p className="last-updated">Last updated: December 28, 2025</p>
           </div>
 
           <Card>
             <CardContent>
               <div>
-                <h2 className="section-title">
-                  Information We Collect {/* Unchanged: Standard privacy */}
-                </h2>
+                <h2 className="section-title">Information We Collect</h2>
                 <p className="section-text">
-                  We collect information you provide when you interact with our platform. This may include your email address if you choose to sign up for updates or save preferences. We also collect usage data such as pages viewed, stories and novels accessed, and interactions within the platform, along with device information and IP addresses for analytics and to ensure platform stability. {/* Refined: From product guides/reviews to stories/novels—aligns with storytelling mission */}
+                  We collect information you provide when you interact with our tech platform, including your email for updates or preferences. We also collect usage data such as pages visited, tools accessed, interactions with AI features, device information, and IP addresses to improve analytics, AI recommendations, and platform stability.
                 </p>
               </div>
 
               <div>
-                <h2 className="section-title">
-                  How We Use Your Information
-                </h2>
+                <h2 className="section-title">How We Use Your Information</h2>
                 <p className="section-text">
-                  Your information helps us operate and improve our free service. We use it to: {/* Unchanged: Structure fits */}
+                  Your information helps us operate and enhance our platform. We use it to:
                 </p>
                 <ul className="list">
-                  <li className="list-item">Provide and maintain the platform.</li>
-                  <li className="list-item">Analyze usage patterns to improve the quality and relevance of our stories and novels.</li> {/* Refined: To stories/novels for narrative focus */}
-                  <li className="list-item">Personalize your experience (e.g., suggesting relevant themes or worlds you might crave).</li> {/* Refined: From niche products to thematic "worlds" evoking draft's immersive fiction */}
-                  <li className="list-item">Communicate with you regarding service updates or other important information.</li>
+                  <li className="list-item">Provide, maintain, and optimize platform tools and AI features.</li>
+                  <li className="list-item">Analyze usage patterns to improve relevance and performance of our digital content and AI recommendations.</li>
+                  <li className="list-item">Personalize your experience, such as suggesting relevant tools, insights, or tech features.</li>
+                  <li className="list-item">Communicate updates, notifications, and important platform information.</li>
                 </ul>
                 <p className="section-text">
-                  We will never sell your personal data. We may use anonymized, aggregated data for research or analytics to better understand our audience and content performance. {/* Unchanged: Transparency aligns */}
+                  We do not sell your personal data. Anonymized, aggregated data may be used for research or analytics to improve our platform and AI models.
                 </p>
               </div>
 
               <div>
-                <h2 className="section-title">
-                  Cookies and Tracking
-                </h2>
+                <h2 className="section-title">Cookies and Tracking</h2>
                 <p className="section-text">
-                  We use cookies and similar technologies to keep you logged in, save your preferences, and track site usage. These tools help us improve functionality and personalize content without collecting personally identifiable information for advertising. You can configure your browser to reject cookies, but this may affect certain features of the platform. {/* Unchanged: General, fits non-ad focus */}
+                  We use cookies and similar technologies to enhance functionality, keep you logged in, save preferences, and track feature usage. You can disable cookies via your browser, but some platform functionality may be limited.
                 </p>
               </div>
 
               <div>
-                <h2 className="section-title">
-                  Third-Party Services
-                </h2>
+                <h2 className="section-title">Third-Party Services</h2>
                 <p className="section-text">
-                  As a free service, we may use third-party services to support our operations, such as for hosting and analytics. These providers may collect data according to their own privacy policies. For example, we use analytics tools to understand platform usage and traffic sources. We encourage you to review their policies. We do not share your personal data with third parties beyond what is necessary to operate and analyze our service. {/* Unchanged: Ties to transparency, no major pivot needed for storytelling */}
+                  We utilize third-party services for hosting, analytics, and AI infrastructure. These providers may collect data according to their privacy policies. We do not share personal data beyond operational necessities.
                 </p>
               </div>
-              
+
               <div>
-                <h2 className="section-title">
-                  Your Privacy Rights
-                </h2>
+                <h2 className="section-title">Your Privacy Rights</h2>
                 <p className="section-text">
-                  Depending on your location, you may have specific rights regarding your personal data. These can include the right to access, correct, or delete your data, and the right to object to or restrict its processing. To exercise these rights or for any privacy concerns, please contact us at privacy@onjo.life. We will respond to all requests in accordance with applicable law. {/* Refined: Email to match brand URL from narrative */}
+                  Depending on your location, you may have rights to access, correct, or delete your data, or restrict processing. Contact us at privacy@onjo.tech to exercise these rights. We respond in accordance with applicable law.
                 </p>
               </div>
             </CardContent>

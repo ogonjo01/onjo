@@ -1,3 +1,4 @@
+// src/components/ContentFeed/ContentFeed.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../supabase/supabaseClient';
 import BookSummaryCard from '../BookSummaryCard/BookSummaryCard';
@@ -6,16 +7,16 @@ import './ContentFeed.css';
 
 const ITEMS_PER_CAROUSEL = 12;
 const CATEGORY_BATCH = 3;
-const MIN_LOAD_MS = 350; // minimum skeleton display to avoid flashes
+const MIN_LOAD_MS = 350;
 
-// Added `slug` to the selects so UI receives the slug for SEO-friendly links
 const LIGHT_SELECT = `
   id,
   created_at,
   title,
   author,
-  summary,
+  description,
   category,
+  tags,
   user_id,
   image_url,
   affiliate_link,
@@ -28,21 +29,21 @@ const SELECT_WITH_COUNTS = `
   created_at,
   title,
   author,
-  summary,
+  description,
   category,
+  tags,
   user_id,
   image_url,
   affiliate_link,
   likes_count:likes!likes_post_id_fkey(count),
   views_count:views!views_post_id_fkey(count),
   comments_count:comments!comments_post_id_fkey(count),
+  avg_rating,
   slug
 `;
 
-// helpers
 const safeData = (d) => (d?.data ?? d ?? []);
 
-// robust parser for numbers/aggregates
 const parseNumber = (v) => {
   if (v == null) return 0;
   if (typeof v === 'number') return v;
@@ -52,6 +53,10 @@ const parseNumber = (v) => {
   }
   if (Array.isArray(v) && v.length) {
     const first = v[0];
+    if (first == null) return 0;
+    if (typeof first === 'object' && 'count' in first) {
+      return Number(first.count) || 0;
+    }
     return parseNumber(first.avg ?? first.count ?? first.value ?? first.avg_rating ?? first.rating ?? first);
   }
   if (typeof v === 'object') {
@@ -74,18 +79,22 @@ const normalizeRow = (r = {}) => {
   const avg_rating = parseNumber(r.avg_rating ?? r.avg ?? r.rating ?? r.average_rating);
   const rating_count = parseNumber(r.rating_count ?? r.ratings_count ?? r.rating_count_aggregate ?? r.count ?? r.rating_count_value);
 
-  // Defensive fallbacks — use trimmed checks so whitespace-only strings don't count
   const safeTitle = _safeString(r.title) || 'Untitled';
   const safeAuthor = _safeString(r.author) || _safeString(r.creator_name) || _safeString(r.creator) || '';
   const safeImage = _safeString(r.image_url) || _safeString(r.cover) || _safeString(r.cover_url) || null;
+
+  const rawTags = r.tags || [];
+  const tags = Array.isArray(rawTags) ? rawTags.map(t => (typeof t === 'string' ? t.trim().toLowerCase() : String(t).toLowerCase())) : [];
 
   return {
     id: r.id,
     slug: r.slug ?? null,
     title: safeTitle,
     author: safeAuthor,
-    summary: r.summary,
+    description: r.description ?? null,
+    summary: r.summary ?? null,
     category: r.category,
+    tags,
     image_url: safeImage,
     affiliate_link: r.affiliate_link,
     likes_count: Number(likes || 0),
@@ -99,25 +108,8 @@ const normalizeRow = (r = {}) => {
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-/* heavy RPC/fallback (mostly unchanged) */
 const fetchRpcOrFallback = async (rpcName, { limit = ITEMS_PER_CAROUSEL, category = null } = {}) => {
-  try {
-    const args = { p_limit: limit };
-    if (category) args.p_category = category;
-    const rpcRes = await supabase.rpc(rpcName, args);
-    if (!rpcRes.error && rpcRes.data) {
-      // debug: inspect rpc output shape
-      console.debug('[fetchRpcOrFallback] rpc data', { rpcName, category, limit, count: (rpcRes.data || []).length, sample: (rpcRes.data || [])[0] });
-      return safeData(rpcRes.data).map(normalizeRow);
-    }
-    if (rpcRes.error) {
-      console.warn(`[rpc] ${rpcName} error:`, rpcRes.error);
-    }
-  } catch (e) {
-    console.warn(`[rpc] ${rpcName} threw`, e?.message || e);
-  }
-
-  // fallback client-side (heavier)
+  // SKIP RPC - force fallback which includes comments_count
   try {
     let q = supabase.from('book_summaries').select(SELECT_WITH_COUNTS);
     if (category) q = q.eq('category', category);
@@ -125,10 +117,8 @@ const fetchRpcOrFallback = async (rpcName, { limit = ITEMS_PER_CAROUSEL, categor
     const { data, error } = await q;
     if (error) throw error;
 
-    // debug: inspect fallback shape
-    console.debug('[fetchRpcOrFallback] fallback data', { rpcName, category, rows: (data || []).length, sample: (data || [])[0] });
+    console.debug('[fetchRpcOrFallback] fallback data', { rpcName, category, rows: (data || []).length });
 
-    // normalize early
     const rows = (data || []).map(normalizeRow);
 
     let sorted = rows.slice();
@@ -168,7 +158,6 @@ const fetchTopCategories = async (limit = 50) => {
 const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQuery = '' }) => {
   const [loadingGlobal, setLoadingGlobal] = useState(true);
 
-  // globalContent will first contain fast placeholders, then replaced by heavy results
   const [globalContent, setGlobalContent] = useState({
     newest: [],
     mostLiked: [],
@@ -181,18 +170,87 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [hasMoreCategories, setHasMoreCategories] = useState(false);
 
+  const [availableTags, setAvailableTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+
+  const [taggedResults, setTaggedResults] = useState(null);
+  const [taggedLoading, setTaggedLoading] = useState(false);
+
+  const [tagsReloadKey, setTagsReloadKey] = useState(0);
+
+  const rootRef = useRef(null);
   const sentinelRef = useRef(null);
   const mountedRef = useRef(true);
 
-  // cache for fast placeholders per-category to avoid refetching
   const fastCacheRef = useRef(new Map());
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
-  // FAST lightweight fetch for immediate UI (by category or global)
-  // DEFAULT limit now equals ITEMS_PER_CAROUSEL to avoid half-populated carousels
+  useEffect(() => {
+    const scrollToFeedTop = () => {
+      try {
+        const el = rootRef.current;
+        if (el) {
+          const rectTop = el.getBoundingClientRect().top + window.pageYOffset;
+          const header = document.querySelector('header');
+          const headerH = header ? (header.offsetHeight || 0) : 0;
+          const top = Math.max(0, rectTop - headerH - 8);
+          window.scrollTo({ top, behavior: 'auto' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'auto' });
+        }
+      } catch (err) {
+        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (e) {}
+      }
+    };
+
+    scrollToFeedTop();
+    const t = setTimeout(scrollToFeedTop, 120);
+    return () => clearTimeout(t);
+  }, [selectedCategory, searchQuery]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        let q = supabase
+          .from('book_summaries')
+          .select('tags')
+          .limit(5000);
+
+        const specific = selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All';
+        if (specific) {
+          q = q.eq('category', selectedCategory);
+        }
+
+        const { data, error } = await q;
+        if (error) throw error;
+
+        const set = new Set();
+        (data || []).forEach(row => {
+          const arr = row?.tags || [];
+          if (Array.isArray(arr)) {
+            arr.forEach(t => {
+              if (t && typeof t === 'string') set.add(t.trim().toLowerCase());
+            });
+          }
+        });
+
+        const list = Array.from(set).sort();
+        if (mountedRef.current) {
+          setAvailableTags(list);
+          setSelectedTags(prev => {
+            if (!Array.isArray(prev) || prev.length === 0) return [];
+            const avail = new Set(list);
+            return prev.filter(t => avail.has(t.toLowerCase()));
+          });
+        }
+      } catch (err) {
+        console.warn('Could not load tags for chips bar', err);
+      }
+    })();
+  }, [selectedCategory, tagsReloadKey]);
+
   const fastFetchList = useCallback(async (limit = ITEMS_PER_CAROUSEL, category = null) => {
-    // check cache
     const cacheKey = category ? `cat:${category}` : `global`;
     const cache = fastCacheRef.current.get(cacheKey);
     if (cache) return cache;
@@ -209,9 +267,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       const { data, error } = await q;
       if (error) throw error;
 
-      // debug: show fast fetch results so you can inspect returned rows in console
-      console.debug('[fastFetchList]', { category, limit, count: (data || []).length, sample: (data || [])[0] });
-
       const normalized = (data || []).map((r) => normalizeRow(r));
       fastCacheRef.current.set(cacheKey, normalized);
       return normalized;
@@ -221,7 +276,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     }
   }, []);
 
-  // heavy fetch (keeps original behavior)
   const fetchContentBlock = useCallback(async (category = null) => {
     try {
       const start = Date.now();
@@ -246,7 +300,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     }
   }, []);
 
-  // helper to replace a block in loadedCategoryBlocks by category (used after background heavy fetch)
   const replaceCategoryBlock = useCallback((newBlock) => {
     setLoadedCategoryBlocks((prev) => {
       const idx = prev.findIndex((b) => String(b.category) === String(newBlock.category));
@@ -259,7 +312,35 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     });
   }, []);
 
-  // loadNextCategoryBatch now: quickly add placeholders then background-replace with heavy results
+  const rankItemsWithBoost = useCallback((items = [], selectedTags = [], sortKey = 'newest') => {
+    if (!items || items.length === 0) return [];
+    if (!selectedTags || selectedTags.length === 0) {
+      if (sortKey === 'newest') return items.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      if (sortKey === 'likes') return items.slice().sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
+      if (sortKey === 'rating') return items.slice().sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
+      if (sortKey === 'views') return items.slice().sort((a, b) => (b.views_count || 0) - (a.views_count || 0));
+      return items.slice();
+    }
+
+    const tagSet = new Set(selectedTags.map(t => t.toLowerCase()));
+    const scored = items.map(it => {
+      const itemTags = Array.isArray(it.tags) ? it.tags.map(t => (t || '').toLowerCase()) : [];
+      const matchCount = itemTags.reduce((acc, t) => acc + (tagSet.has(t) ? 1 : 0), 0);
+      return { it, matchCount };
+    });
+
+    const sorted = scored.sort((a, b) => {
+      if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+      if (sortKey === 'newest') return new Date(b.it.created_at) - new Date(a.it.created_at);
+      if (sortKey === 'likes') return (b.it.likes_count || 0) - (a.it.likes_count || 0);
+      if (sortKey === 'rating') return (b.it.avg_rating || 0) - (a.it.avg_rating || 0);
+      if (sortKey === 'views') return (b.it.views_count || 0) - (a.it.views_count || 0);
+      return 0;
+    }).map(s => s.it);
+
+    return sorted;
+  }, []);
+
   const loadNextCategoryBatch = useCallback(async () => {
     if (loadingCategories) return;
     if (!categoryQueue || categoryQueue.length === 0) {
@@ -269,11 +350,9 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     setLoadingCategories(true);
     const batch = categoryQueue.slice(0, CATEGORY_BATCH);
     const rest = categoryQueue.slice(batch.length);
-    // optimistic queue update
     setCategoryQueue(rest);
 
     try {
-      // 1) fast placeholders for batch (immediate)
       const placeholderPromises = batch.map((c) => fastFetchList(4, c).then((items) => ({
         category: c,
         newest: items,
@@ -283,10 +362,8 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       })));
       const placeholders = await Promise.all(placeholderPromises);
       if (!mountedRef.current) return;
-      // append placeholders quickly
       setLoadedCategoryBlocks((prev) => [...prev, ...placeholders]);
 
-      // 2) start background heavy fetch to replace placeholders
       (async () => {
         try {
           const blocks = await Promise.all(batch.map((c) => fetchContentBlock(c)));
@@ -306,7 +383,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     }
   }, [categoryQueue, loadingCategories, fetchContentBlock, fastFetchList, replaceCategoryBlock]);
 
-  // MAIN orchestration
   useEffect(() => {
     (async () => {
       setLoadingGlobal(true);
@@ -315,7 +391,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       setHasMoreCategories(false);
       setGlobalContent({ newest: [], mostLiked: [], highestRated: [], mostViewed: [] });
 
-      // SEARCH mode
       if (searchQuery && searchQuery.trim()) {
         const start = Date.now();
         try {
@@ -327,6 +402,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
           if (error) throw error;
           const rows = safeData(data).map(normalizeRow);
           if (mountedRef.current) setGlobalContent({ newest: rows, mostLiked: [], highestRated: [], mostViewed: [] });
+          setTagsReloadKey(k => k + 1);
         } catch (err) {
           console.error('search error', err);
         } finally {
@@ -337,7 +413,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         return;
       }
 
-      // SPECIFIC CATEGORY PAGE
       const specific = selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All';
       if (specific) {
         const start = Date.now();
@@ -346,12 +421,12 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
           if (mountedRef.current) {
             setLoadedCategoryBlocks([{ category: selectedCategory, newest: placeholder, mostLiked: placeholder, highestRated: placeholder, mostViewed: placeholder }]);
           }
-          // background heavy fetch & replace
           (async () => {
             try {
               const block = await fetchContentBlock(selectedCategory);
               if (!mountedRef.current) return;
               setLoadedCategoryBlocks((block.newest.length || block.mostLiked.length || block.highestRated.length || block.mostViewed.length) ? [block] : []);
+              setTagsReloadKey(k => k + 1);
             } catch (err) {
               console.error('specific category background fetch error', err);
             }
@@ -366,24 +441,21 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         return;
       }
 
-      // DEFAULT For You flow
       const start = Date.now();
       try {
-        // 1) FAST placeholder global content (single cheap request) -> immediate paint
         const fast = await fastFetchList(ITEMS_PER_CAROUSEL);
         if (!mountedRef.current) return;
         setGlobalContent({ newest: fast, mostLiked: fast, highestRated: fast, mostViewed: fast });
 
-        // 2) background: load heavy global block + categories + initial category placeholders -> then replace with heavy blocks
         (async () => {
           try {
             const [globalBlock, cats] = await Promise.all([fetchContentBlock(), fetchTopCategories(200)]);
             if (!mountedRef.current) return;
             setGlobalContent(globalBlock);
+            setTagsReloadKey(k => k + 1);
             setCategoryQueue(cats);
             setHasMoreCategories(cats.length > 0);
 
-            // initial category placeholders (fast)
             const initialBatch = cats.slice(0, CATEGORY_BATCH);
             const rest = cats.slice(initialBatch.length);
             if (initialBatch.length) {
@@ -400,7 +472,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
               setCategoryQueue(rest);
               setHasMoreCategories(rest.length > 0);
 
-              // background: fetch full blocks & replace placeholders
               (async () => {
                 try {
                   const blocks = await Promise.all(initialBatch.map((c) => fetchContentBlock(c)));
@@ -424,10 +495,8 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         if (mountedRef.current) setLoadingGlobal(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, searchQuery, fastFetchList, fetchContentBlock, replaceCategoryBlock]);
 
-  // sentinel observer for loading additional categories
   useEffect(() => {
     if (!sentinelRef.current) return;
     const node = sentinelRef.current;
@@ -442,29 +511,209 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     return () => obs.disconnect();
   }, [hasMoreCategories, loadingCategories, loadNextCategoryBatch]);
 
-  const renderCards = (items) => (items || []).map((summary) => (
-    // Use stable DB id as the key. Do NOT prefer slug here — slug may be backfilled later and would change the key.
-    <BookSummaryCard key={String(summary.id ?? summary.slug)} summary={summary} onEdit={onEdit} onDelete={onDelete} />
-  ));
+  const fetchTaggedContent = useCallback(async (tag, category = null, limit = ITEMS_PER_CAROUSEL) => {
+    if (!tag) return [];
+    try {
+      let q = supabase
+        .from('book_summaries')
+        .select(SELECT_WITH_COUNTS)
+        .contains('tags', [tag])
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (category) q = q.eq('category', category);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []).map(normalizeRow);
+    } catch (err) {
+      console.error('fetchTaggedContent error', err);
+      return [];
+    }
+  }, []);
+
+  const buildViewAllLink = (sortKey = 'newest', category = null, tag = null, fields = 'id,title,description,author,created_at,tags') => {
+    const params = new URLSearchParams();
+    if (sortKey) params.set('sort', sortKey);
+    if (category) params.set('category', category);
+    if (tag) {
+      params.set('tag', tag);
+      params.set('tag_only', '1');
+    }
+    if (fields) params.set('fields', fields);
+    return `/explore?${params.toString()}`;
+  };
+
+  const buildSeeMoreText = ({ sortKey = 'newest', category = null, tag = null } = {}) => {
+    const sortMap = {
+      newest: 'Newest Content',
+      likes: 'Most Liked content',
+      rating: 'Most Rated Content',
+      views: 'Most Viewed Content',
+    };
+    const base = sortMap[sortKey] || 'more content';
+    if (tag) return `Explore More From ${base} In "${tag}"`;
+    if (category) return `Explore More From ${base} In ${category}`;
+    return `Explore More From ${base}`;
+  };
+
+  const SeeMoreCTA = ({ href, text }) => {
+    if (!href) return null;
+    return (
+      <div className="see-more-wrapper" aria-hidden={false}>
+        <a href={href} className="see-more-btn" role="button">
+          {text}
+        </a>
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!selectedTags || selectedTags.length === 0) {
+        setTaggedResults(null);
+        setTaggedLoading(false);
+        return;
+      }
+
+      const tag = selectedTags[0];
+      setTaggedLoading(true);
+      try {
+        const rows = await fetchTaggedContent(tag, (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, ITEMS_PER_CAROUSEL);
+        if (!mountedRef.current || !mounted) return;
+        setTaggedResults(rows || []);
+      } catch (err) {
+        console.error('tag fetch failed', err);
+        if (mountedRef.current && mounted) setTaggedResults([]);
+      } finally {
+        if (mountedRef.current && mounted) setTaggedLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [selectedTags, selectedCategory, fetchTaggedContent]);
+
+  const toggleTag = (tag) => {
+    const lower = tag.toLowerCase();
+    setSelectedTags(prev => {
+      const cur = Array.isArray(prev) ? prev : [];
+      if (cur.length > 0 && cur[0] === lower) {
+        return [];
+      }
+      return [lower];
+    });
+  };
+
+  const clearTags = () => setSelectedTags([]);
+
+  const renderCards = (items, sortKey) => {
+    const ranked = rankItemsWithBoost(items || [], selectedTags, sortKey);
+    return (ranked || []).map((summary) => (
+      <BookSummaryCard key={String(summary.id ?? summary.slug)} summary={summary} onEdit={onEdit} onDelete={onDelete} />
+    ));
+  };
 
   const isForYou = selectedCategory === 'For You' || selectedCategory === 'All';
 
   return (
-    <div className="content-feed-root">
-      {/* SEARCH */}
-      {searchQuery && searchQuery.trim() && (
-        <HorizontalCarousel
-          title={`Search results for "${searchQuery}"`}
-          items={globalContent.newest}
-          loading={loadingGlobal}
-          skeletonCount={6}
-          viewAllLink={`/explore?q=${encodeURIComponent(searchQuery)}`}
-        >
-          {renderCards(globalContent.newest)}
-        </HorizontalCarousel>
+    <div className="content-feed-root" ref={rootRef}>
+      <section
+        className="intro-banner"
+        role="region"
+        aria-label="Mission statement"
+        aria-live="polite"
+      >
+        <div className="intro-banner-inner">
+          <div className="intro-banner-icon" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" role="img">
+              <path d="M3 6c0 6 4 10 9 12 5-2 9-6 9-12-4 0-7 3-9 3S7 6 3 6z" fill="white" opacity="0.15" />
+              <path d="M12 2c-.9 1.3-3.6 3.1-8 3v2c4.2 0 7 2 8 3 1-1 3.8-3 8-3V5c-4.4 0-7.1-1.7-8-3z" fill="white" opacity="0.08" />
+            </svg>
+          </div>
+
+          <div className="intro-banner-text">
+            <div className="intro-banner-title">
+              ONJO TECH
+            </div>
+            <div className="intro-banner-subtitle">
+              Empowering innovators with actionable knowledge in electronics, programming, AI, cybersecurity, and more.
+            </div>
+          </div>
+
+          <div className="intro-banner-cta">
+            <a className="btn-mini" href="/about" title="Learn more about our mission">Learn more</a>
+          </div>
+        </div>
+      </section>
+
+      <div className="categories-bar" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+          {availableTags.length === 0 ? (
+            (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? (
+              <div className="hf-loading">No tags for this category.</div>
+            ) : (
+              <div className="hf-loading">Loading tags…</div>
+            )
+          ) : (
+            availableTags.map((tag) => {
+              const active = selectedTags.includes(tag.toLowerCase());
+              return (
+                <button
+                  key={tag}
+                  className={`category-chip ${active ? 'active' : ''}`}
+                  onClick={() => toggleTag(tag)}
+                  aria-pressed={active}
+                  type="button"
+                  title={`Filter by ${tag}`}
+                >
+                  {tag}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {selectedTags.length > 0 && (
+            <button className="hf-btn" type="button" onClick={clearTags}>Clear tags ({selectedTags.length})</button>
+          )}
+        </div>
+      </div>
+
+      {selectedTags.length > 0 && (
+        <section className="feed-section">
+          <HorizontalCarousel
+            title={`Tag: ${selectedTags[0]}`}
+            items={taggedResults || []}
+            loading={taggedLoading}
+            skeletonCount={6}
+          >
+            {renderCards(taggedResults || [], 'newest')}
+          </HorizontalCarousel>
+
+          <SeeMoreCTA
+            href={buildViewAllLink('newest', (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, selectedTags[0])}
+            text={buildSeeMoreText({ sortKey: 'newest', category: (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, tag: selectedTags[0] })}
+          />
+        </section>
       )}
 
-      {/* SPECIFIC CATEGORY PAGE */}
+      {searchQuery && searchQuery.trim() && (
+        <section className="feed-section">
+          <HorizontalCarousel
+            title={`Search results for "${searchQuery}"`}
+            items={globalContent.newest}
+            loading={loadingGlobal}
+            skeletonCount={6}
+          >
+            {renderCards(globalContent.newest, 'newest')}
+          </HorizontalCarousel>
+
+          <SeeMoreCTA
+            href={`/explore?q=${encodeURIComponent(searchQuery)}`}
+            text={`Explore more results for "${searchQuery}"`}
+          />
+        </section>
+      )}
+
       {(!isForYou && !searchQuery) && loadedCategoryBlocks.length > 0 && (
         <div key={loadedCategoryBlocks[0].category}>
           {['newest', 'mostLiked', 'highestRated', 'mostViewed'].map((k) => {
@@ -477,104 +726,161 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
             const items = loadedCategoryBlocks[0][k];
             const sortKey = k === 'newest' ? 'newest' : (k === 'mostLiked' ? 'likes' : (k === 'highestRated' ? 'rating' : 'views'));
             return (
-              <HorizontalCarousel
-                key={k}
-                title={titleMap[k]}
-                items={items}
-                loading={loadingGlobal}
-                skeletonCount={6}
-                viewAllLink={`/explore?sort=${sortKey}&category=${encodeURIComponent(loadedCategoryBlocks[0].category)}`}
-              >
-                {renderCards(items)}
-              </HorizontalCarousel>
+              <section className="feed-section" key={k}>
+                <HorizontalCarousel
+                  title={titleMap[k]}
+                  items={items}
+                  loading={loadingGlobal}
+                  skeletonCount={6}
+                >
+                  {renderCards(items, sortKey)}
+                </HorizontalCarousel>
+
+                <SeeMoreCTA
+                  href={buildViewAllLink(sortKey, loadedCategoryBlocks[0].category)}
+                  text={buildSeeMoreText({ sortKey, category: loadedCategoryBlocks[0].category })}
+                />
+              </section>
             );
           })}
         </div>
       )}
 
-      {/* FOR YOU / ALL */}
       {isForYou && !searchQuery && (
         <>
-          <HorizontalCarousel
-            title="Newest"
-            items={globalContent.newest}
-            loading={loadingGlobal}
-            skeletonCount={6}
-            viewAllLink="/explore?sort=newest"
-          >
-            {renderCards(globalContent.newest)}
-          </HorizontalCarousel>
-          <HorizontalCarousel
-            title="Most Liked"
-            items={globalContent.mostLiked}
-            loading={loadingGlobal}
-            skeletonCount={6}
-            viewAllLink="/explore?sort=likes"
-          >
-            {renderCards(globalContent.mostLiked)}
-          </HorizontalCarousel>
-          <HorizontalCarousel
-            title="Most Rated"
-            items={globalContent.highestRated}
-            loading={loadingGlobal}
-            skeletonCount={6}
-            viewAllLink="/explore?sort=rating"
-          >
-            {renderCards(globalContent.highestRated)}
-          </HorizontalCarousel>
-          <HorizontalCarousel
-            title="Most Viewed"
-            items={globalContent.mostViewed}
-            loading={loadingGlobal}
-            skeletonCount={6}
-            viewAllLink="/explore?sort=views"
-          >
-            {renderCards(globalContent.mostViewed)}
-          </HorizontalCarousel>
+          <section className="feed-section">
+            <HorizontalCarousel
+              title="Newest"
+              items={globalContent.newest}
+              loading={loadingGlobal}
+              skeletonCount={6}
+            >
+              {renderCards(globalContent.newest, 'newest')}
+            </HorizontalCarousel>
+
+            <SeeMoreCTA
+              href={buildViewAllLink('newest', null)}
+              text={buildSeeMoreText({ sortKey: 'newest' })}
+            />
+          </section>
+
+          <section className="feed-section">
+            <HorizontalCarousel
+              title="Most Liked"
+              items={globalContent.mostLiked}
+              loading={loadingGlobal}
+              skeletonCount={6}
+            >
+              {renderCards(globalContent.mostLiked, 'likes')}
+            </HorizontalCarousel>
+
+            <SeeMoreCTA
+              href={buildViewAllLink('likes', null)}
+              text={buildSeeMoreText({ sortKey: 'likes' })}
+            />
+          </section>
+
+          <section className="feed-section">
+            <HorizontalCarousel
+              title="Most Rated"
+              items={globalContent.highestRated}
+              loading={loadingGlobal}
+              skeletonCount={6}
+            >
+              {renderCards(globalContent.highestRated, 'rating')}
+            </HorizontalCarousel>
+
+            <SeeMoreCTA
+              href={buildViewAllLink('rating', null)}
+              text={buildSeeMoreText({ sortKey: 'rating' })}
+            />
+          </section>
+
+          <section className="feed-section">
+            <HorizontalCarousel
+              title="Most Viewed"
+              items={globalContent.mostViewed}
+              loading={loadingGlobal}
+              skeletonCount={6}
+            >
+              {renderCards(globalContent.mostViewed, 'views')}
+            </HorizontalCarousel>
+
+            <SeeMoreCTA
+              href={buildViewAllLink('views', null)}
+              text={buildSeeMoreText({ sortKey: 'views' })}
+            />
+          </section>
 
           {loadedCategoryBlocks.map((block) => (
             <section className="category-block" key={block.category}>
               <div className="category-block-header">
                 <h3 className="cat-title">{block.category}</h3>
-                <a className="cat-viewall" href={`/explore?category=${encodeURIComponent(block.category)}`}>View all</a>
               </div>
 
-              <HorizontalCarousel
-                title={`Newest in ${block.category}`}
-                items={block.newest}
-                loading={loadingGlobal}
-                skeletonCount={4}
-                viewAllLink={`/explore?sort=newest&category=${encodeURIComponent(block.category)}`}
-              >
-                {renderCards(block.newest)}
-              </HorizontalCarousel>
-              <HorizontalCarousel
-                title={`Most Liked in ${block.category}`}
-                items={block.mostLiked}
-                loading={loadingGlobal}
-                skeletonCount={4}
-                viewAllLink={`/explore?sort=likes&category=${encodeURIComponent(block.category)}`}
-              >
-                {renderCards(block.mostLiked)}
-              </HorizontalCarousel>
-              <HorizontalCarousel
-                title={`Highest Rated in ${block.category}`}
-                items={block.highestRated}
-                loading={loadingGlobal}
-                skeletonCount={4}
-                viewAllLink={`/explore?sort=rating&category=${encodeURIComponent(block.category)}`}
-              >
-                {renderCards(block.highestRated)}
-              </HorizontalCarousel>
-              <HorizontalCarousel
-                title={`Most Viewed in ${block.category}`}
-                items={block.mostViewed}
-                loading={loadingGlobal}
-                skeletonCount={4}
-                viewAllLink={`/explore?sort=views&category=${encodeURIComponent(block.category)}`}
-              >
-                {renderCards(block.mostViewed)}
-              </HorizontalCarousel>
+              <section className="feed-section">
+                <HorizontalCarousel
+                  title={`Newest in ${block.category}`}
+                  items={block.newest}
+                  loading={loadingGlobal}
+                  skeletonCount={4}
+                >
+                  {renderCards(block.newest, 'newest')}
+                </HorizontalCarousel>
+
+                <SeeMoreCTA
+                  href={buildViewAllLink('newest', block.category)}
+                  text={buildSeeMoreText({ sortKey: 'newest', category: block.category })}
+                />
+              </section>
+
+              <section className="feed-section">
+                <HorizontalCarousel
+                  title={`Most Liked in ${block.category}`}
+                  items={block.mostLiked}
+                  loading={loadingGlobal}
+                  skeletonCount={4}
+                >
+                  {renderCards(block.mostLiked, 'likes')}
+                </HorizontalCarousel>
+
+                <SeeMoreCTA
+                  href={buildViewAllLink('likes', block.category)}
+                  text={buildSeeMoreText({ sortKey: 'likes', category: block.category })}
+                />
+              </section>
+
+              <section className="feed-section">
+                <HorizontalCarousel
+                  title={`Highest Rated in ${block.category}`}
+                  items={block.highestRated}
+                  loading={loadingGlobal}
+                  skeletonCount={4}
+                >
+                  {renderCards(block.highestRated, 'rating')}
+                </HorizontalCarousel>
+
+                <SeeMoreCTA
+                  href={buildViewAllLink('rating', block.category)}
+                  text={buildSeeMoreText({ sortKey: 'rating', category: block.category })}
+                />
+              </section>
+
+              <section className="feed-section">
+                <HorizontalCarousel
+                  title={`Most Viewed in ${block.category}`}
+                  items={block.mostViewed}
+                  loading={loadingGlobal}
+                  skeletonCount={4}
+                >
+                  {renderCards(block.mostViewed, 'views')}
+                </HorizontalCarousel>
+
+                <SeeMoreCTA
+                  href={buildViewAllLink('views', block.category)}
+                  text={buildSeeMoreText({ sortKey: 'views', category: block.category })}
+                />
+              </section>
             </section>
           ))}
 
