@@ -1,6 +1,6 @@
 // src/components/SummaryView/SummaryView.jsx
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabase/supabaseClient';
 import { FaHeart, FaStar, FaComment, FaEye } from 'react-icons/fa';
 import CommentsSection from '../CommentsSection/CommentsSection';
@@ -67,17 +67,14 @@ const extractYouTubeId = (url = '') => {
   return anyMatch ? anyMatch[1] : null;
 };
 
-// strip HTML (simple), used as fallback
 const stripHtml = (html = '') => String(html || '').replace(/<[^>]*>/g, '').trim();
 
-// sanitize + truncate helper for card descriptions
 const makeSafeDescription = (raw = '', maxLen = 140) => {
   const cleaned = DOMPurify.sanitize(String(raw || ''), { ALLOWED_TAGS: [] });
   const plain = stripHtml(cleaned);
   return plain.length > maxLen ? `${plain.slice(0, maxLen)}…` : plain;
 };
 
-/* Helper: build a lightweight card object (NO `summary` field) */
 const buildLightItem = (nr = {}, src = {}) => {
   let rawDesc =
     (src.description !== undefined ? src.description : null) ??
@@ -111,6 +108,8 @@ const buildLightItem = (nr = {}, src = {}) => {
 const SummaryView = () => {
   const { param } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [summary, setSummary] = useState(null);
   const [postId, setPostId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,6 +119,7 @@ const SummaryView = () => {
   const [views, setViews] = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
   const [avgRating, setAvgRating] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0); // NEW: show count
   const [userRating, setUserRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [savingRating, setSavingRating] = useState(false);
@@ -136,6 +136,7 @@ const SummaryView = () => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
 
+  // get current user id once
   useEffect(() => {
     (async () => {
       try {
@@ -147,16 +148,30 @@ const SummaryView = () => {
     })();
   }, []);
 
+  // ----------------------------
+  // Scroll-to-top on navigation
+  // ----------------------------
   useEffect(() => {
-    try {
-      if (pageRef && pageRef.current && typeof pageRef.current.scrollTo === 'function') {
-        pageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      } else if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Always reset scroll position immediately on route change.
+    const scrollToTop = () => {
+      const main = document.querySelector('.main-content');
+      if (main && typeof main.scrollTo === 'function') {
+        main.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       }
-    } catch (e) {}
-  }, [param]);
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      }
+    };
 
+    scrollToTop();
+    // also schedule one frame later to handle layout shifts
+    const raf = requestAnimationFrame(scrollToTop);
+    return () => cancelAnimationFrame(raf);
+  }, [location.pathname]);
+
+  // ----------------------------
+  // Load minimal summary (no heavy summary field)
+  // ----------------------------
   useEffect(() => {
     let mounted = true;
     const loadMinimalSummary = async () => {
@@ -229,6 +244,15 @@ const SummaryView = () => {
         setPostId(normalized.id);
         setOwnerId(normalized.user_id ?? null);
 
+        // reset UI counts until authoritative fetch arrives
+        setLikes(0);
+        setViews(0);
+        setCommentsCount(0);
+        setAvgRating(0);
+        setRatingCount(0);
+        setUserHasLiked(false);
+        setUserRating(0);
+
         setIsLoading(false);
 
         backgroundFetchFollowups(normalized.id, normalized.category).catch((e) => console.debug(e));
@@ -246,10 +270,14 @@ const SummaryView = () => {
     return () => { mounted = false; };
   }, [param, navigate]);
 
+  // ----------------------------
+  // background followups: authoritative counts, increment view, ratings, user-specific
+  // ----------------------------
   const backgroundFetchFollowups = async (resolvedPostId, category = '') => {
     try {
       if (!resolvedPostId) return;
 
+      // 1) authoritative initial read (SELECT_WITH_COUNTS)
       try {
         const { data, error } = await supabase
           .from('book_summaries')
@@ -270,17 +298,33 @@ const SummaryView = () => {
         console.warn('[backgroundFetchFollowups] initial counts fetch error', e);
       }
 
+      // 2) average rating & rating count
       try {
-        const { data: ratingData, error: ratingErr } = await supabase.rpc('get_average_rating', { p_post_id: resolvedPostId });
-        if (!ratingErr && Array.isArray(ratingData) && ratingData[0] && ratingData[0].average_rating !== null) {
+        const { data: ratingData } = await supabase.rpc('get_average_rating', { p_post_id: resolvedPostId });
+        if (Array.isArray(ratingData) && ratingData[0] && ratingData[0].average_rating !== null) {
           setAvgRating(Math.round(Number(ratingData[0].average_rating) * 10) / 10);
-        } else if (ratingErr) {
-          console.warn('[backgroundFetchFollowups] get_average_rating error', ratingErr);
         }
       } catch (e) {
-        console.warn('[backgroundFetchFollowups] get_average_rating unexpected error', e);
+        console.warn('[backgroundFetchFollowups] get_average_rating error', e);
       }
 
+      // fetch rating count directly from ratings table (reliable)
+      try {
+        const { data: ratingsData, error: ratingsErr, count } = await supabase
+          .from('ratings')
+          .select('id', { count: 'exact' })
+          .eq('post_id', resolvedPostId);
+
+        if (!ratingsErr) {
+          // supabase returns `count` when count mode is used; fallback to length
+          const rc = typeof count === 'number' ? count : (Array.isArray(ratingsData) ? ratingsData.length : 0);
+          setRatingCount(Number(rc || 0));
+        }
+      } catch (e) {
+        console.warn('[backgroundFetchFollowups] rating count fetch error', e);
+      }
+
+      // 3) user-specific info (likes, user's rating)
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -299,19 +343,21 @@ const SummaryView = () => {
         console.warn('[backgroundFetchFollowups] auth.getUser error', e);
       }
 
+      // 4) increment views: insert into views table with optional user id
       try {
         const insertPayload = [{ post_id: resolvedPostId, user_id: currentUserId ?? null }];
-        console.log('[backgroundFetchFollowups] inserting view for', resolvedPostId, 'payload:', insertPayload);
         const { data: insertData, error: insertErr } = await supabase
           .from('views')
           .insert(insertPayload);
 
         if (insertErr) {
-          console.error('[backgroundFetchFollowups] views insert error', insertErr);
+          console.warn('[backgroundFetchFollowups] views insert error', insertErr);
+          // optimistic fallback
           setViews((v) => (Number(v) || 0) + 1);
         } else {
           setViews((v) => (Number(v) || 0) + 1);
 
+          // re-fetch authoritative counts from book_summaries (views/likes/comments)
           try {
             const { data: refreshed, error: refreshErr } = await supabase
               .from('book_summaries')
@@ -323,14 +369,13 @@ const SummaryView = () => {
               console.warn('[backgroundFetchFollowups] could not refresh counts', refreshErr);
             } else if (refreshed) {
               const authoritativeViews = Number(refreshed.views_count ?? 0);
-              console.log('[backgroundFetchFollowups] refreshed views_count from DB:', authoritativeViews);
               setViews(authoritativeViews);
-              setSummary(prev => prev ? { ...prev, views_count: authoritativeViews } : prev);
               setLikes(Number(refreshed.likes_count ?? 0));
               setCommentsCount(Number(refreshed.comments_count ?? 0));
+              setSummary(prev => prev ? { ...prev, views_count: authoritativeViews } : prev);
             }
           } catch (e) {
-            console.error('[backgroundFetchFollowups] unexpected error while re-fetching counts', e);
+            console.warn('[backgroundFetchFollowups] unexpected error while re-fetching counts', e);
           }
         }
       } catch (e) {
@@ -338,6 +383,7 @@ const SummaryView = () => {
         setViews((v) => (Number(v) || 0) + 1);
       }
 
+      // 5) fetch recommended content (best-effort)
       if ((category ?? '').trim()) {
         fetchRecommended(category, 10, resolvedPostId).catch(err => {
           console.warn('[backgroundFetchFollowups] fetchRecommended error', err);
@@ -390,12 +436,29 @@ const SummaryView = () => {
         return false;
       }
 
+      // refresh average and rating count
       try {
         const { data: ratingData } = await supabase.rpc('get_average_rating', { p_post_id: postId });
         if (Array.isArray(ratingData) && ratingData[0] && ratingData[0].average_rating !== null) {
           setAvgRating(Math.round(Number(ratingData[0].average_rating) * 10) / 10);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('get_average_rating error after save', e);
+      }
+
+      try {
+        const { data: ratingsData, error: ratingsErr, count } = await supabase
+          .from('ratings')
+          .select('id', { count: 'exact' })
+          .eq('post_id', postId);
+
+        if (!ratingsErr) {
+          const rc = typeof count === 'number' ? count : (Array.isArray(ratingsData) ? ratingsData.length : 0);
+          setRatingCount(Number(rc || 0));
+        }
+      } catch (e) {
+        console.warn('rating count fetch error after save', e);
+      }
 
       setUserRating(value);
       return true;
@@ -438,6 +501,7 @@ const SummaryView = () => {
     return arr;
   };
 
+  // listen for scroll to manage header collapse
   useEffect(() => {
     const scroller = document.querySelector('.main-content') || window;
     let ticking = false;
@@ -488,40 +552,13 @@ const SummaryView = () => {
     };
   }, [summary]);
 
+  // --- fetchRecommended: provide lightweight items WITHOUT `summary` ---
   const fetchRecommended = useCallback(async (category, limit = 10, resolvedPostId = null) => {
     setIsRecommending(true);
     setRecError(null);
     try {
       const cat = String(category ?? '').trim();
       if (!cat) { setRecommendedContent([]); return []; }
-
-      // TEMPORARILY DISABLED RPC - it doesn't return comments_count
-      // try {
-      //   const rpcRes = await supabase.rpc('get_top_viewed_by_category', { p_limit: limit, p_category: cat });
-      //   if (!rpcRes.error && Array.isArray(rpcRes.data)) {
-      //     let rows = (rpcRes.data || []).map(d => {
-      //       console.log('[fetchRecommended RPC] Raw data from RPC:', d);
-      //       const nr = normalizeRow(d);
-      //       console.log('[fetchRecommended RPC] After normalizeRow:', nr);
-      //       const light = buildLightItem(nr, d);
-      //       console.log('[fetchRecommended RPC] After buildLightItem:', light);
-      //       return light;
-      //     }).filter(r => String(r.id) !== String(resolvedPostId));
-
-      //     rows = rows.map(r => {
-      //       const copy = { ...r };
-      //       if ('summary' in copy) delete copy.summary;
-      //       copy.description = makeSafeDescription(copy.description || '', 140);
-      //       return copy;
-      //     });
-
-      //     console.log('[fetchRecommended RPC] Final rows being set:', rows);
-      //     setRecommendedContent(rows.slice(0, limit));
-      //     return rows.slice(0, limit);
-      //   }
-      // } catch (rpcErr) {
-      //   console.debug('RPC recommended failed, fallback to select', rpcErr);
-      // }
 
       const { data, error } = await supabase
         .from('book_summaries')
@@ -547,36 +584,9 @@ const SummaryView = () => {
 
       if (error) throw error;
 
-      console.log('[fetchRecommended FALLBACK] Raw data from Supabase:', data);
-
       let rows = (data || []).map(d => {
-        console.log('[fetchRecommended FALLBACK] Processing item:', {
-          id: d.id,
-          title: d.title,
-          raw_comments_count: d.comments_count,
-          raw_likes_count: d.likes_count,
-          raw_views_count: d.views_count
-        });
-        
         const nr = normalizeRow(d);
-        console.log('[fetchRecommended FALLBACK] After normalizeRow:', {
-          id: nr.id,
-          title: nr.title,
-          comments_count: nr.comments_count,
-          likes_count: nr.likes_count,
-          views_count: nr.views_count
-        });
-        
-        const light = buildLightItem(nr, d);
-        console.log('[fetchRecommended FALLBACK] After buildLightItem:', {
-          id: light.id,
-          title: light.title,
-          comments_count: light.comments_count,
-          likes_count: light.likes_count,
-          views_count: light.views_count
-        });
-        
-        return light;
+        return buildLightItem(nr, d);
       }).filter(r => String(r.id) !== String(resolvedPostId));
 
       rows.sort((a, b) => {
@@ -615,7 +625,6 @@ const SummaryView = () => {
       });
 
       const top = rows.slice(0, limit);
-      console.log('[fetchRecommended FALLBACK] Final rows being set:', top);
       setRecommendedContent(top);
       return top;
     } catch (err) {
@@ -694,7 +703,10 @@ const SummaryView = () => {
           <div className="eng-item" title="Views"><FaEye /> <span>{views ?? 0}</span></div>
           <div className="rating-block" title={`Average rating ${avgRating || 0}`}>
             <div className="rating-stars">{renderStars('md')}</div>
-            <div className="avg-text">{avgRating ? Number(avgRating).toFixed(1) : '0.0'}</div>
+            <div className="avg-text">
+              {avgRating ? Number(avgRating).toFixed(1) : '0.0'}
+              <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 6 }}>({ratingCount ?? 0})</span>
+            </div>
           </div>
         </div>
       </header>
@@ -743,13 +755,6 @@ const SummaryView = () => {
               avg_rating: Number(item.avg_rating) || 0,
               description: makeSafeDescription(item.description || '', 140)
             };
-
-            console.log('[SummaryView] Passing to BookSummaryCard:', {
-              title: card.title,
-              comments_count: card.comments_count,
-              likes_count: card.likes_count,
-              views_count: card.views_count
-            });
 
             return (
               <BookSummaryCard

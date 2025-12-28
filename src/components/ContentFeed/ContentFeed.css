@@ -5,8 +5,8 @@
   /* Chip / tag tokens (light-green theme) */
   --green-50: #dff8ef;     /* very light background */
   --green-100: #00ff5e;    /* border/accents */
-  --green-700: #065f46;    /* main chip text */
-  --green-800: #054d3a;    /* darker for hover */
+  --green-700: #004e92;    /* main chip text */
+  --green-800: #7af0d0;    /* darker for hover */
   --green-overlay: rgba(93, 225, 157, 0.92); /* overlay fill */
 
   /* previous names (kept for compatibility) */
@@ -171,7 +171,7 @@
 
 background: linear-gradient(
   90deg,
-  rgba(65, 142, 105, 0.92),
+  rgba(22, 32, 27, 0.92),
   rgba(100, 212, 141, 0.93),
   rgba(144, 236, 255, 0.94)
 );
