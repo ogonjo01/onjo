@@ -36,24 +36,27 @@ class CustomClipboard extends Clipboard {
 
 Quill.register("modules/clipboard", CustomClipboard, true);
 
-// FINAL 10 CATEGORIES
+
 const categories = [
-  "Business Strategy & Systems",
-  "Courses & Learning Paths",
-  "Best Books",
-  "Business Ideas",
-  "Book Summaries",
-  "Entrepreneurship",
-  "Self-Improvement",
-  "Marketing & Sales",
-  "Money & Productivity",
-  "Mindset & Motivation",
-  "Career Development",
-  "Video Insights",
-  "Digital Skills & Technology",
-  "Leadership & Management",
-  "Strategic Communication"
+  "Programming & Software Engineering",
+  "Artificial Intelligence & Machine Learning",
+  "Cybersecurity",
+  "Computer Science Fundamentals",
+  "Data Science & Analytics",
+  "Cloud Computing & DevOps",
+  "Electronics & Embedded Systems",
+  "Telecommunications",
+  "Networking & Infrastructure",
+  "Internet of Things (IoT)",
+  "Robotics & Automation",
+  "Operating Systems & Virtualization",
+  "System Design & Architecture",
+  "Software Testing & Quality Assurance",
+  "Blockchain & Web3",
+  "Quantum Computing",
+  "AR / VR / XR Technologies"
 ];
+
 
 const CreateSummaryForm = ({ onClose, onNewSummary }) => {
   const [title, setTitle] = useState("");

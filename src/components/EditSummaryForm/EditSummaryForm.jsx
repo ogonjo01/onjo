@@ -7,23 +7,26 @@ import { supabase } from '../../supabase/supabaseClient';
 import 'react-quill/dist/quill.snow.css';
 import './EditSummaryForm.css';
 
-const CATEGORIES = [
-  "Best Books",
-  "Business Strategy & Systems",
-  "Courses & Learning Paths",
-  "Business Ideas",
-  "Book Summaries",
-  "Entrepreneurship",
-  "Self-Improvement",
-  "Marketing & Sales",
-  "Money & Productivity",
-  "Mindset & Motivation",
-  "Career Development",
-  "Video Insights",
-  "Digital Skills & Technology",
-  "Leadership & Management",
-  "Strategic Communication"
+const categories = [
+  "Programming & Software Engineering",
+  "Artificial Intelligence & Machine Learning",
+  "Cybersecurity",
+  "Computer Science Fundamentals",
+  "Data Science & Analytics",
+  "Cloud Computing & DevOps",
+  "Electronics & Embedded Systems",
+  "Telecommunications",
+  "Networking & Infrastructure",
+  "Internet of Things (IoT)",
+  "Robotics & Automation",
+  "Operating Systems & Virtualization",
+  "System Design & Architecture",
+  "Software Testing & Quality Assurance",
+  "Blockchain & Web3",
+  "Quantum Computing",
+  "AR / VR / XR Technologies"
 ];
+
 
 const quillModules = {
   toolbar: [
