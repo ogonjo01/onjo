@@ -54,6 +54,7 @@ const categories = [
   "Software Testing & Quality Assurance",
   "Blockchain & Web3",
   "Quantum Computing",
+  "Video Insights",
   "AR / VR / XR Technologies"
 ];
 
