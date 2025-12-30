@@ -7,7 +7,7 @@ import { supabase } from '../../supabase/supabaseClient';
 import 'react-quill/dist/quill.snow.css';
 import './EditSummaryForm.css';
 
-const categories = [
+const CATEGORIES = [
   "Programming & Software Engineering",
   "Artificial Intelligence & Machine Learning",
   "Cybersecurity",
@@ -27,7 +27,6 @@ const categories = [
   "Video Insights",
   "AR / VR / XR Technologies"
 ];
-
 
 const quillModules = {
   toolbar: [
