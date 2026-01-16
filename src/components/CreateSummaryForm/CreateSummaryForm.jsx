@@ -162,7 +162,7 @@ const CreateSummaryForm = ({ onClose, onNewSummary }) => {
       console.error(error);
     } else {
       alert(
-        `Summary created successfully! URL: https://ogonjo.com/summary/${finalSlug}`
+        `Summary created successfully! URL: https://onjoreview.com/summary/${finalSlug}`
       );
 
       // Reset

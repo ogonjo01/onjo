@@ -627,7 +627,7 @@ const SummaryView = () => {
   }, [summary]);
 
   /* ---------- Derived / memoized values (always defined) ---------- */
-  const BRAND = 'OGONJO';
+  const BRAND = 'ONJO REVIEW';
   const SITE_DEFAULT_OG = useMemo(() => {
     try {
       if (typeof window !== 'undefined' && window.location.origin) {
@@ -637,7 +637,7 @@ const SummaryView = () => {
     return 'https://your-ogonjo-app.netlify.app/ogonjo.jpg';
   }, []);
 
-  const metaTitle = useMemo(() => `${summary?.title || 'Loading…'} – Book Summary | ${BRAND}`, [summary?.title]);
+  const metaTitle = useMemo(() => `${summary?.title || 'Loading…'} – ${BRAND}`, [summary?.title]);
   const metaDescription = useMemo(
     () => makeSafeDescription(summary?.description || summary?.summary || '', 160),
     [summary?.description, summary?.summary]
