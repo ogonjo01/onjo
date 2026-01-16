@@ -13,8 +13,7 @@ const Footer = () => {
               <h1>ONJO Reviews</h1>
             </Link>
             <p>
-              Honest product reviews and recommendations designed to help people
-              make better buying decisions through clear insights and comparisons.
+              We review, compare, and break down products to help people make better buying decisions.
             </p>
           </div>
 

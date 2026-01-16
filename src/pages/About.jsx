@@ -76,7 +76,7 @@ const About = () => {
         <section className="about-hero-section reveal">
           <h1 className="about-title">About ONJO Reviews</h1>
           <p className="about-subtitle">
-            <em>Honest product reviews and recommendations to help people make better buying decisions.</em>
+            <em>We review, compare, and break down products to help people make better buying decisions.</em>
           </p>
         </section>
 

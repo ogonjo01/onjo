@@ -680,7 +680,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         "@type": "WebPage",
         "url": SITE_ORIGIN + (typeof window !== 'undefined' ? window.location.pathname : '/'),
         "name": "ONJO Reviews — Product Reviews & Recommendations",
-        "description": "ONJO Reviews provides honest product reviews and recommendation lists for tech products, software, and gadgets.",
+        "description": "ONJO Reviews is a product review and recommendation platform that evaluates tools through real-world use, clear pros and cons, and side-by-side comparisons.",
         "mainEntity": lists,
       };
 
@@ -727,7 +727,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
           border: 0,
         }}
       >
-        ONJO Reviews — Honest product reviews and recommendations for tech, software, and gadgets
+        ONJO Reviews — Product evaluation and recommendation platform
       </h1>
 
       <section
@@ -749,7 +749,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
               ONJO Reviews
             </div>
             <div className="intro-banner-subtitle">
-              Honest product reviews and recommendations to help people make better buying decisions on tech, gadgets, and software.
+              We review, compare, and break down products to help people make better buying decisions.
             </div>
           </div>
 
