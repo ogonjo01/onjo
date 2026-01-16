@@ -7,7 +7,7 @@ import { supabase } from '../../supabase/supabaseClient';
 import 'react-quill/dist/quill.snow.css';
 import './EditSummaryForm.css';
 
-const categories = [
+const CATEGORIES = [
   "Kitchen & Cooking",
   "Home & Garden",
   "Electronics & Tech",
@@ -30,7 +30,6 @@ const categories = [
   "Cooking & Recipe Resources"
 ];
 
-
 const quillModules = {
   toolbar: [
     [{ header: [1, 2, 3, false] }],
@@ -50,8 +49,13 @@ const quillFormats = [
 
 const normalizeTag = (t) => (typeof t === 'string' ? t.trim().toLowerCase() : String(t).trim().toLowerCase());
 
+const MAX_TAGS = 20;
+
 const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {} }) => {
-  // initialize from passed summary safely
+  // keep id stable for the lifetime of this modal to avoid race updates
+  const initialIdRef = useRef(summary.id ?? null);
+
+  // state initialized from incoming summary (safe defaults)
   const [title, setTitle] = useState(summary.title || '');
   const [slug, setSlug] = useState(summary.slug || '');
   const [author, setAuthor] = useState(summary.author || '');
@@ -61,34 +65,36 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
   const [imageUrl, setImageUrl] = useState(summary.image_url || '');
   const [affiliateLink, setAffiliateLink] = useState(summary.affiliate_link || '');
   const [youtubeUrl, setYoutubeUrl] = useState(summary.youtube_url || '');
-  const [tags, setTags] = useState(Array.isArray(summary.tags) ? summary.tags.map(normalizeTag) : []);
+  const [tags, setTags] = useState(Array.isArray(summary.tags) ? summary.tags.map(normalizeTag).slice(0, MAX_TAGS) : []);
   const [tagInput, setTagInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // keep a stable ref to avoid race issues if parent re-renders
-  const initialIdRef = useRef(summary.id);
-
   // portal container ref
   const portalElRef = useRef(null);
 
-  // auto-generate slug preview when title changes (does not try to guarantee uniqueness)
+  // keep slug in sync with title (auto-generate)
   useEffect(() => {
-    if (!title) { setSlug(''); return; }
+    if (!title) {
+      setSlug('');
+      return;
+    }
     const generated = slugify(title, { lower: true, replacement: '-', strict: true });
     setSlug(generated);
   }, [title]);
 
-  // create portal element on mount and remove on unmount
+  // create portal element on mount and remove on unmount (SSR-safe)
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const el = document.createElement('div');
     el.className = 'edit-summary-portal';
     document.body.appendChild(el);
     portalElRef.current = el;
-    // prevent body scroll while modal is open
+
+    // prevent body scroll while modal open
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
     return () => {
       document.body.style.overflow = prevOverflow || '';
       if (portalElRef.current) {
@@ -96,19 +102,31 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
         portalElRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // if the parent passes a different summary while modal is open, do NOT change initialIdRef.
+  // But if you *do* want the form to reset when summary.id changes, uncomment:
+  // useEffect(() => { initialIdRef.current = summary.id ?? null; }, [summary.id]);
+
   // Tag helpers
+  const addTagParts = (parts = []) => {
+    if (!Array.isArray(parts) || parts.length === 0) return;
+    setTags(prev => {
+      const s = new Set(prev || []);
+      parts.map(normalizeTag).filter(Boolean).forEach(p => {
+        if (s.size < MAX_TAGS) s.add(p);
+      });
+      return Array.from(s).slice(0, MAX_TAGS);
+    });
+  };
+
   const addTagFromInput = (raw = '') => {
     const value = (raw || tagInput || '').trim();
     if (!value) return;
-    // allow comma-separated batch
-    const parts = value.split(',').map(p => normalizeTag(p)).filter(Boolean);
-    setTags(prev => {
-      const s = new Set(prev || []);
-      parts.forEach(p => s.add(p));
-      return Array.from(s).slice(0, 20); // limit to 20 tags
-    });
+    // allow comma-separated or space-separated batches
+    const parts = value.split(/[,\n]+/).map(p => p.trim()).filter(Boolean);
+    addTagParts(parts);
     setTagInput('');
   };
 
@@ -117,9 +135,16 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
       e.preventDefault();
       addTagFromInput();
     } else if (e.key === 'Backspace' && !tagInput) {
-      // remove last tag on backspace when input empty
       setTags(prev => (prev && prev.length ? prev.slice(0, -1) : []));
     }
+  };
+
+  const handleTagPaste = (e) => {
+    const pasted = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+    if (!pasted) return;
+    e.preventDefault();
+    const parts = pasted.split(/[,\n]+/).map(p => p.trim()).filter(Boolean);
+    addTagParts(parts);
   };
 
   const removeTag = (t) => {
@@ -131,7 +156,7 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
     if (!title.trim()) return 'Title is required';
     if (!author.trim()) return 'Author is required';
     if (!category) return 'Category is required';
-    // optional: validate youtube url pattern
+    // optional: more validation for URLs, youtube, etc.
     return null;
   };
 
@@ -144,16 +169,17 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
     setErrorMsg('');
 
     try {
-      // confirm current user (permission check)
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user ?? null;
+      // robustly fetch current user (works with different supabase client versions)
+      const authRes = await supabase.auth.getUser();
+      const user = authRes?.data?.user ?? authRes?.user ?? null;
+
       if (!user) {
         setErrorMsg('You must be signed in to update this summary.');
         setLoading(false);
         return;
       }
 
-      // Prepare payload - only send fields you want to update
+      // Prepare payload - send only fields we want to update
       const payload = {
         title: title.trim(),
         author: author.trim(),
@@ -164,14 +190,14 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
         affiliate_link: affiliateLink || null,
         youtube_url: youtubeUrl || null,
         tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
-        slug: slug || null, // DB trigger should ensure uniqueness if necessary
+        slug: slug || null
       };
 
-      // run update
+      // run update against the stable id stored in ref (guards against parent re-render races)
       const { data, error } = await supabase
         .from('book_summaries')
         .update(payload)
-        .eq('id', summary.id)
+        .eq('id', initialIdRef.current)
         .select()
         .maybeSingle();
 
@@ -183,12 +209,10 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
         return;
       }
 
-      // success -> call onUpdate with latest row
       if (typeof onUpdate === 'function') {
         onUpdate(data ?? null);
       }
 
-      // close modal
       if (typeof onClose === 'function') onClose();
     } catch (err) {
       console.error('Unexpected edit error', err);
@@ -211,17 +235,20 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
 
   const youtubeId = extractYouTubeId(youtubeUrl);
 
-  // If portal element hasn't been created yet, render nothing (pre-SSR safe)
-  if (!portalElRef.current) return null;
+  // SSR-safe: if portal element hasn't been created yet, render nothing
+  if (typeof document === 'undefined' || !portalElRef.current) return null;
 
-  // Modal JSX
   const modal = (
-    <div className="modal-overlay" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-content edit-large" role="dialog" aria-modal="true" aria-label="Edit summary">
+    <div
+      className="modal-overlay"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="modal-content edit-large" role="dialog" aria-modal="true" aria-label="Edit summary" onClick={(e) => e.stopPropagation()}>
         <button className="close-button" onClick={onClose} aria-label="Close">&times;</button>
         <h2>Edit Summary</h2>
 
-        <form onSubmit={handleSubmit} className="summary-form" onClick={(e) => e.stopPropagation()}>
+        <form onSubmit={handleSubmit} className="summary-form">
           <label htmlFor="title">Title</label>
           <input id="title" type="text" value={title} onChange={e => setTitle(e.target.value)} required />
 
@@ -267,6 +294,7 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
               value={tagInput}
               onChange={e => setTagInput(e.target.value)}
               onKeyDown={handleTagKey}
+              onPaste={handleTagPaste}
             />
             <button type="button" className="hf-btn" onClick={() => addTagFromInput(tagInput)}>Add</button>
           </div>
