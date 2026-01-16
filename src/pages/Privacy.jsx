@@ -1,10 +1,10 @@
 import React from 'react';
 
-// Mock Header component to keep all code in a single file
+// Mock Header component
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO</h1> {/* Brand consistency */}
+      <h1 className="header-title">ONJO Reviews</h1>
     </div>
   </header>
 );
@@ -13,7 +13,7 @@ const Header = () => (
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO. All rights reserved.</p>
+      <p>&copy; {new Date().getFullYear()} ONJO Reviews. All rights reserved.</p>
     </div>
   </footer>
 );
@@ -153,7 +153,7 @@ const Privacy = () => {
         <main className="main-content">
           <div className="hero-section">
             <h1 className="page-title">Privacy Policy</h1>
-            <p className="last-updated">Last updated: December 28, 2025</p>
+            <p className="last-updated">Last updated: January 15, 2026</p>
           </div>
 
           <Card>
@@ -161,44 +161,44 @@ const Privacy = () => {
               <div>
                 <h2 className="section-title">Information We Collect</h2>
                 <p className="section-text">
-                  We collect information you provide when you interact with our tech platform, including your email for updates or preferences. We also collect usage data such as pages visited, tools accessed, interactions with AI features, device information, and IP addresses to improve analytics, AI recommendations, and platform stability.
+                  We collect information you provide when interacting with ONJO Reviews, such as your email for updates or preferences. We also collect usage data, including pages viewed, product categories explored, link clicks, and device information, to improve our recommendations and platform experience.
                 </p>
               </div>
 
               <div>
                 <h2 className="section-title">How We Use Your Information</h2>
                 <p className="section-text">
-                  Your information helps us operate and enhance our platform. We use it to:
+                  Your information helps us operate and enhance ONJO Reviews. We use it to:
                 </p>
                 <ul className="list">
-                  <li className="list-item">Provide, maintain, and optimize platform tools and AI features.</li>
-                  <li className="list-item">Analyze usage patterns to improve relevance and performance of our digital content and AI recommendations.</li>
-                  <li className="list-item">Personalize your experience, such as suggesting relevant tools, insights, or tech features.</li>
-                  <li className="list-item">Communicate updates, notifications, and important platform information.</li>
+                  <li className="list-item">Provide, maintain, and improve our product reviews and recommendation tools.</li>
+                  <li className="list-item">Analyze user interactions to enhance content relevance and quality.</li>
+                  <li className="list-item">Personalize your experience by suggesting products or categories of interest.</li>
+                  <li className="list-item">Send updates, notifications, or important platform information.</li>
                 </ul>
                 <p className="section-text">
-                  We do not sell your personal data. Anonymized, aggregated data may be used for research or analytics to improve our platform and AI models.
+                  We do not sell your personal data. Aggregated or anonymized data may be used to improve our platform and affiliate product recommendations.
                 </p>
               </div>
 
               <div>
                 <h2 className="section-title">Cookies and Tracking</h2>
                 <p className="section-text">
-                  We use cookies and similar technologies to enhance functionality, keep you logged in, save preferences, and track feature usage. You can disable cookies via your browser, but some platform functionality may be limited.
+                  We use cookies and similar technologies to enhance functionality, remember preferences, and analyze interactions with product reviews. You can disable cookies in your browser, though some features may be limited.
                 </p>
               </div>
 
               <div>
                 <h2 className="section-title">Third-Party Services</h2>
                 <p className="section-text">
-                  We utilize third-party services for hosting, analytics, and AI infrastructure. These providers may collect data according to their privacy policies. We do not share personal data beyond operational necessities.
+                  ONJO Reviews uses third-party services for hosting, analytics, and affiliate integrations. These providers may collect data according to their privacy policies. Personal data is shared only as necessary for platform operation.
                 </p>
               </div>
 
               <div>
                 <h2 className="section-title">Your Privacy Rights</h2>
                 <p className="section-text">
-                  Depending on your location, you may have rights to access, correct, or delete your data, or restrict processing. Contact us at privacy@onjo.tech to exercise these rights. We respond in accordance with applicable law.
+                  Depending on your location, you may have rights to access, correct, or delete your data, or restrict processing. Contact us at privacy@onjo.reviews to exercise these rights. We respond in accordance with applicable law.
                 </p>
               </div>
             </CardContent>

@@ -3,14 +3,14 @@ import React from 'react';
 /* ================= HEADER ================= */
 const Header = () => (
   <header style={{ padding: '1rem', backgroundColor: '#2f7d6d', color: '#ffffff', textAlign: 'center' }}>
-    <h1 style={{ margin: 0, letterSpacing: 1 }}>ONJO TECH</h1>
+    <h1 style={{ margin: 0, letterSpacing: 1 }}>ONJO Reviews</h1>
   </header>
 );
 
 /* ================= FOOTER ================= */
 const Footer = () => (
   <footer style={{ padding: '2rem', backgroundColor: '#1f5f54', color: '#ffffff', textAlign: 'center' }}>
-    <p>© 2025 ONJO TECH. Building clarity in a complex technological world.</p>
+    <p>© 2025 ONJO Reviews. Helping you choose better.</p>
   </footer>
 );
 
@@ -74,55 +74,57 @@ const About = () => {
       <main className="main-content">
         {/* HERO */}
         <section className="about-hero-section reveal">
-          <h1 className="about-title">About ONJO TECH</h1>
-          <p className="about-subtitle"><em>Empowering innovators with actionable knowledge in electronics, programming, AI, cybersecurity, and more.</em></p>
+          <h1 className="about-title">About ONJO Reviews</h1>
+          <p className="about-subtitle">
+            <em>Honest product reviews and recommendations to help people make better buying decisions.</em>
+          </p>
         </section>
 
         <section className="about-content-section">
-          {/* What ONJO TECH Is */}
+          {/* What ONJO Reviews Is */}
           <div className="content-block reveal delay-1">
-            <h2 className="content-heading">What ONJO TECH Is</h2>
+            <h2 className="content-heading">What ONJO Reviews Is</h2>
             <p className="content-paragraph">
-              ONJO TECH is an educational technology platform focused on breaking down complex systems into clear, structured, and practical knowledge for learners, developers, and innovators.
+              ONJO Reviews is a product review and recommendation platform built to simplify decision-making.
+              We evaluate products through clear explanations, practical insights, and transparent pros and cons
+              so people can choose with confidence.
             </p>
           </div>
 
-          {/* Knowledge Pillars */}
+          {/* Review Focus Areas */}
           <div className="content-block reveal delay-2">
-            <h2 className="content-heading">Our Knowledge Pillars</h2>
+            <h2 className="content-heading">What We Review</h2>
             <ul className="values-list">
-              <li><span className="value-name">Electronics</span>Circuits, transistors, embedded systems</li>
-              <li><span className="value-name">Telecommunications</span>Signals, networks, wireless infrastructure</li>
-              <li><span className="value-name">Programming</span>Logic, coding, system-level architecture</li>
-              <li><span className="value-name">Artificial Intelligence</span>Machine learning, neural networks, NLP</li>
-              <li><span className="value-name">Cybersecurity</span>Encryption, threat modeling, network defense</li>
-              <li><span className="value-name">Emerging Tech</span>IoT, robotics, blockchain, quantum computing</li>
-              <li><span className="value-name">Cloud & DevOps</span>Deployment, CI/CD, scalable infrastructure</li>
-              <li><span className="value-name">Data Science</span>Data modeling, analytics, visualization</li>
-              <li><span className="value-name">Web & Mobile Dev</span>Frontend, backend, frameworks, UI/UX</li>
-              <li><span className="value-name">Human-Machine Interfaces</span>AR/VR, interactive systems, user experience</li>
+              <li><span className="value-name">Technology & Gadgets</span>Devices, hardware, and everyday tech tools</li>
+              <li><span className="value-name">Software & SaaS</span>Productivity, business, and creative software</li>
+              <li><span className="value-name">AI Tools</span>Automation, content, and workflow enhancement tools</li>
+              <li><span className="value-name">Developer Tools</span>Platforms, services, and technical solutions</li>
+              <li><span className="value-name">Online Services</span>Digital platforms and subscription services</li>
+              <li><span className="value-name">Product Comparisons</span>Side-by-side analysis to clarify choices</li>
+              <li><span className="value-name">Buying Guides</span>Clear recommendations for specific needs</li>
+              <li><span className="value-name">Use-Case Reviews</span>How products perform in real-world scenarios</li>
             </ul>
           </div>
 
           {/* Audience */}
           <div className="content-block reveal delay-3">
-            <h2 className="content-heading">Who ONJO TECH Is For</h2>
+            <h2 className="content-heading">Who ONJO Reviews Is For</h2>
             <div className="team-grid">
               <div className="team-member">
-                <h3 className="member-name">Learners</h3>
-                <p className="member-bio">Students and enthusiasts seeking deep understanding</p>
+                <h3 className="member-name">Everyday Buyers</h3>
+                <p className="member-bio">People who want clear answers before making a purchase</p>
               </div>
               <div className="team-member">
-                <h3 className="member-name">Developers</h3>
-                <p className="member-bio">System-level thinkers and builders</p>
+                <h3 className="member-name">Professionals</h3>
+                <p className="member-bio">Users choosing tools for work, business, or productivity</p>
               </div>
               <div className="team-member">
-                <h3 className="member-name">Engineers</h3>
-                <p className="member-bio">Designers of scalable systems and innovative solutions</p>
+                <h3 className="member-name">Creators & Builders</h3>
+                <p className="member-bio">Those selecting software, services, and platforms to build with</p>
               </div>
               <div className="team-member">
-                <h3 className="member-name">Educators</h3>
-                <p className="member-bio">Teachers simplifying complex technology for learners</p>
+                <h3 className="member-name">Curious Researchers</h3>
+                <p className="member-bio">People comparing options before committing time or money</p>
               </div>
             </div>
           </div>

@@ -4,7 +4,7 @@ import React from 'react';
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO TECH</h1>
+      <h1 className="header-title">ONJO Reviews</h1>
     </div>
   </header>
 );
@@ -13,7 +13,7 @@ const Header = () => (
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO TECH. All rights reserved.</p>
+      <p>&copy; {new Date().getFullYear()} ONJO Reviews. All rights reserved.</p>
     </div>
   </footer>
 );
@@ -132,28 +132,28 @@ const Terms = () => {
         <main className="main-content">
           <div className="hero-section">
             <h1 className="page-title">Terms of Service</h1>
-            <p className="last-updated">Last updated: December 28, 2025</p>
+            <p className="last-updated">Last updated: January 15, 2026</p>
           </div>
 
           <div className="content-card">
             <div className="section">
               <h2 className="section-title">Introduction</h2>
               <p className="section-content">
-                Welcome to ONJO TECH, a platform providing educational content in technology, programming, AI, cybersecurity, and telecommunications. By accessing or using our Service, you agree to be bound by these Terms of Service ("Terms"). If you do not agree with any part of these Terms, you may not use our Service.
+                Welcome to ONJO Reviews, a platform providing honest product reviews and recommendations. By accessing or using our Service, you agree to be bound by these Terms of Service ("Terms"). If you do not agree with any part of these Terms, please refrain from using our Service.
               </p>
             </div>
 
             <div className="section">
               <h2 className="section-title">1. Intellectual Property & Content</h2>
               <p className="section-content">
-                All content on the Service, including tutorials, guides, graphics, and logos, is our property or the property of our content suppliers and is protected by copyright and intellectual property laws. The materials are intended for personal educational use only. You may not reproduce, distribute, modify, or create derivative works from our content without our explicit written permission.
+                All content on ONJO Reviews, including reviews, comparisons, guides, graphics, and logos, is our property or the property of our partners and is protected by copyright and intellectual property laws. Materials are intended for personal use only. You may not reproduce, distribute, modify, or create derivative works without explicit written permission.
               </p>
             </div>
 
             <div className="section">
               <h2 className="section-title">2. Disclaimers and Limitation of Liability</h2>
               <p className="section-content">
-                The Service is provided on an "as is" and "as available" basis. We do not make any warranties, express or implied, regarding the accuracy, reliability, or completeness of the content. The materials are for educational purposes only and do not substitute for professional advice. We are not liable for any decisions made based on content from our Service.
+                The Service is provided on an "as is" and "as available" basis. While we aim for accuracy and clarity in our reviews, we make no warranties regarding the completeness or suitability of information. Decisions made based on our content are your responsibility. We are not liable for outcomes resulting from using the Service.
               </p>
             </div>
 
@@ -163,24 +163,24 @@ const Terms = () => {
                 You agree not to use the Service for any unlawful or prohibited purpose, including but not limited to:
               </p>
               <ul className="list">
-                <li>Copying, distributing, or reselling the educational content.</li>
-                <li>Attempting to gain unauthorized access to our systems.</li>
-                <li>Using automated means (e.g., bots, scrapers) to collect content or data.</li>
-                <li>Using the Service in any way that could harm or overload our servers.</li>
+                <li>Copying, distributing, or reselling reviews or content.</li>
+                <li>Attempting unauthorized access to our systems.</li>
+                <li>Using automated tools (e.g., bots, scrapers) to collect data or content.</li>
+                <li>Actions that could harm or overload our servers or interfere with user experience.</li>
               </ul>
             </div>
 
             <div className="section">
               <h2 className="section-title">4. Changes to the Terms</h2>
               <p className="section-content">
-                We reserve the right to modify these Terms at any time. Updated Terms will be posted on this page. Your continued use of the Service after changes constitutes acceptance of the new Terms.
+                We reserve the right to update these Terms at any time. Updated Terms will be posted here, and your continued use of ONJO Reviews constitutes acceptance of the changes.
               </p>
             </div>
 
             <div className="section">
               <h2 className="section-title">5. Governing Law</h2>
               <p className="section-content">
-                These Terms are governed by the laws of the United States, without regard to its conflict of law provisions. Any legal action related to these Terms will be brought in the courts of the United States.
+                These Terms are governed by the laws of the United States. Any legal matters related to these Terms will be resolved in the courts of the United States.
               </p>
             </div>
           </div>

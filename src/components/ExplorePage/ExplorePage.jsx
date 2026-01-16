@@ -1,234 +1,224 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { supabase } from '../../supabase/supabaseClient';
-import BookSummaryCard from '../BookSummaryCard/BookSummaryCard';
-import './ExplorePage.css';
+// src/pages/ExplorePage.jsx
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
+import { supabase } from "../../supabase/supabaseClient";
+import BookSummaryCard from "../BookSummaryCard/BookSummaryCard";
+import "./ExplorePage.css";
 
-const SELECT_WITH_COUNTS = `
+/* ---------------------------------- */
+/* Config & helpers                   */
+/* ---------------------------------- */
+
+const SELECT = `
   id,
   created_at,
   title,
   author,
-  summary,
+  description,
   category,
-  user_id,
   image_url,
   affiliate_link,
-  likes_count:likes!likes_post_id_fkey(count),
-  views_count:views!views_post_id_fkey(count),
-  comments_count:comments!comments_post_id_fkey(count)
+  tags,
+  slug,
+  avg_rating,
+  likes_count:likes(count),
+  views_count:views(count),
+  comments_count:comments(count)
 `;
 
-const normalizeCount = (maybeArr) => {
-  try {
-    return Number(maybeArr?.[0]?.count || 0);
-  } catch {
-    return 0;
-  }
+const ITEMS_PER_PAGE = 16;
+
+const normalizeRow = (r) => {
+  const text = r.description || "";
+  return {
+    ...r,
+    title: r.title || "Untitled",
+    author: r.author || "",
+    description: text,
+    excerpt: text.length > 240 ? text.slice(0, 237).trim() + "…" : text,
+    tags: Array.isArray(r.tags) ? r.tags.map((t) => t.toLowerCase()) : [],
+    avg_rating: Number(r.avg_rating || 0),
+    likes_count: r.likes_count?.[0]?.count || 0,
+    views_count: r.views_count?.[0]?.count || 0,
+    comments_count: r.comments_count?.[0]?.count || 0,
+  };
 };
 
-const normalizeRow = (r = {}) => ({
-  id: r.id,
-  title: r.title,
-  author: r.author,
-  summary: r.summary,
-  category: r.category,
-  image_url: r.image_url,
-  affiliate_link: r.affiliate_link,
-  likes_count: normalizeCount(r.likes_count),
-  views_count: normalizeCount(r.views_count),
-  comments_count: normalizeCount(r.comments_count),
-  created_at: r.created_at ?? null,
-});
+const useQuery = () => new URLSearchParams(useLocation().search);
 
-const ITEMS_PER_PAGE = 20;
-
-const useQuery = () => {
-  const { search } = useLocation();
-  return React.useMemo(() => new URLSearchParams(search), [search]);
-};
+/* ---------------------------------- */
+/* Explore Page                       */
+/* ---------------------------------- */
 
 const ExplorePage = () => {
-  const q = useQuery();
-  const rawCategory = q.get('category') || '';
-  const sortType = (q.get('sort') || 'newest').toLowerCase();
-  const searchTerm = (q.get('q') || q.get('search') || '').trim();
+  const location = useLocation();
+  const query = useQuery();
 
-  const category = (rawCategory || '').trim();
+  const searchTerm = (query.get("q") || "").trim();
+  const category = query.get("category");
+  const tag = query.get("tag");
+  const sort = (query.get("sort") || "newest").toLowerCase();
 
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
+  const [related, setRelated] = useState([]);
   const [offset, setOffset] = useState(0);
-  const [error, setError] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const sentinelRef = useRef(null);
-  const mountedRef = useRef(true);
+  const fetchingRef = useRef(false);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  /* ---------------------------------- */
+  /* Main search / feed fetch           */
+  /* ---------------------------------- */
 
   const fetchItems = useCallback(
-    async (pageOffset = 0, append = false) => {
+    async (start = 0, append = false) => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
       setLoading(true);
-      setError(null);
 
       try {
-        // SEARCH MODE
+        let q = supabase.from("book_summaries").select(SELECT);
+
+        if (category) q = q.eq("category", category);
+        if (tag) q = q.contains("tags", [tag]);
+
         if (searchTerm) {
-          // Try RPC search first (fast / full-text if you have it). Fallback to ilike OR if RPC unavailable.
-          try {
-            const lim = 500; // get up to 500 results and paginate client-side
-            const rpcRes = await supabase.rpc('book_summaries_search_prefix', { q: searchTerm, lim });
-            if (!rpcRes.error && Array.isArray(rpcRes.data)) {
-              const all = (rpcRes.data || []).map(normalizeRow);
-              // client-side sort + paginate
-              const sorted = all.sort((a, b) => {
-                if (sortType === 'views') return (b.views_count || 0) - (a.views_count || 0);
-                if (sortType === 'likes') return (b.likes_count || 0) - (a.likes_count || 0);
-                return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-              });
-              const slice = sorted.slice(pageOffset, pageOffset + ITEMS_PER_PAGE);
-              if (mountedRef.current) {
-                setItems((prev) => (append ? [...prev, ...slice] : slice));
-                setOffset(pageOffset + slice.length);
-                setHasMore(pageOffset + slice.length < sorted.length);
-              }
-              return;
-            }
-            // if rpc returned an error, fall through to fallback
-            console.debug('[ExplorePage] RPC search not available or returned error, using fallback.');
-          } catch (rpcErr) {
-            console.debug('[ExplorePage] RPC search threw:', rpcErr);
-            // continue to fallback
-          }
-
-          // FALLBACK: ilike OR across title / author / summary
-          try {
-            const pattern = `%${searchTerm}%`;
-            // build OR clause
-            const { data, error } = await supabase
-              .from('book_summaries')
-              .select(SELECT_WITH_COUNTS)
-              .or(`title.ilike.${pattern},author.ilike.${pattern},summary.ilike.${pattern}`)
-              .range(pageOffset, pageOffset + ITEMS_PER_PAGE - 1);
-
-            if (error) throw error;
-            const normalized = (data || []).map(normalizeRow);
-            const sortedRows = normalized.sort((a, b) => {
-              if (sortType === 'views') return (b.views_count || 0) - (a.views_count || 0);
-              if (sortType === 'likes') return (b.likes_count || 0) - (a.likes_count || 0);
-              return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-            });
-
-            if (mountedRef.current) {
-              if (append) setItems((prev) => [...prev, ...sortedRows]);
-              else setItems(sortedRows);
-              setOffset(pageOffset + (data?.length || 0));
-              setHasMore((data?.length || 0) === ITEMS_PER_PAGE);
-            }
-            return;
-          } catch (err) {
-            console.error('Explore search fallback error:', err);
-            if (mountedRef.current) setError('Search failed.');
-            return;
-          }
+          const pattern = `%${searchTerm}%`;
+          q = q.or(
+            `title.ilike.${pattern},author.ilike.${pattern},description.ilike.${pattern}`
+          );
         }
 
-        // NON-SEARCH MODE: normal category/sort browsing
-        let query = supabase.from('book_summaries').select(SELECT_WITH_COUNTS, { count: 'exact' });
+        if (sort === "views") q = q.order("views_count", { ascending: false });
+        else if (sort === "likes") q = q.order("likes_count", { ascending: false });
+        else if (sort === "rating") q = q.order("avg_rating", { ascending: false });
+        else q = q.order("created_at", { ascending: false });
 
-        if (category) {
-          // use exact match for category. If you want partial/case-insensitive use ilike with `%${category}%`
-          query = query.eq('category', category);
-        }
+        q = q.range(start, start + ITEMS_PER_PAGE - 1);
 
-        const { data, error } = await query.range(pageOffset, pageOffset + ITEMS_PER_PAGE - 1);
+        const { data, error } = await q;
         if (error) throw error;
 
-        const normalizedRows = (data || []).map(normalizeRow);
+        const normalized = (data || []).map(normalizeRow);
 
-        const sortedRows = normalizedRows.sort((a, b) => {
-          if (sortType === 'views') return (b.views_count || 0) - (a.views_count || 0);
-          if (sortType === 'likes') return (b.likes_count || 0) - (a.likes_count || 0);
-          return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-        });
-
-        if (mountedRef.current) {
-          if (append) {
-            setItems((prev) => [...prev, ...sortedRows]);
-          } else {
-            setItems(sortedRows);
-          }
-          setOffset(pageOffset + (data?.length || 0));
-          setHasMore((data?.length || 0) === ITEMS_PER_PAGE);
-        }
+        setItems((prev) => (append ? [...prev, ...normalized] : normalized));
+        setOffset(start + normalized.length);
+        setHasMore(normalized.length === ITEMS_PER_PAGE);
       } catch (err) {
-        console.error('Explore fetch error:', err);
-        if (mountedRef.current) setError('Unable to load content.');
+        console.error("Explore fetch error:", err);
       } finally {
-        if (mountedRef.current) setLoading(false);
+        fetchingRef.current = false;
+        setLoading(false);
       }
     },
-    [category, sortType, searchTerm]
+    [searchTerm, category, tag, sort]
   );
 
+  /* ---------------------------------- */
+  /* Related content (search only)      */
+  /* ---------------------------------- */
+
+  const fetchRelated = useCallback(async () => {
+    if (!searchTerm) {
+      setRelated([]);
+      return;
+    }
+
+    try {
+      const keyword = searchTerm.split(" ")[0];
+      const pattern = `%${keyword}%`;
+
+      const { data } = await supabase
+        .from("book_summaries")
+        .select(SELECT)
+        .or(
+          `title.ilike.${pattern},author.ilike.${pattern},description.ilike.${pattern}`
+        )
+        .limit(8);
+
+      setRelated((data || []).map(normalizeRow));
+    } catch {
+      setRelated([]);
+    }
+  }, [searchTerm]);
+
+  /* ---------------------------------- */
+  /* Effects                            */
+  /* ---------------------------------- */
+
   useEffect(() => {
-    // reset when query / category / sort change
     setItems([]);
     setOffset(0);
     setHasMore(true);
     fetchItems(0, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, sortType, searchTerm]);
+    fetchRelated();
+  }, [location.search, fetchItems, fetchRelated]);
 
   useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || !hasMore || loading) return;
+    if (!hasMore || loading) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) fetchItems(offset, true);
-      },
-      { root: null, rootMargin: '800px', threshold: 0.1 }
+      ([e]) => e.isIntersecting && fetchItems(offset, true),
+      { rootMargin: "600px" }
     );
 
-    observer.observe(node);
+    if (sentinelRef.current) observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loading, offset, fetchItems]);
+  }, [offset, hasMore, loading, fetchItems]);
 
-  const getTitle = () => {
-    if (searchTerm) return `Search: "${searchTerm}"`;
-    const sortTitle = { views: 'Most Viewed', likes: 'Most Liked', newest: 'Newest' };
-    return `${sortTitle[sortType] || sortType}${category ? `: ${category}` : ''}`;
-  };
+  /* ---------------------------------- */
+  /* Render                             */
+  /* ---------------------------------- */
+
+  const showEmptySearch =
+    searchTerm && !loading && items.length === 0;
 
   return (
     <div className="explore-page">
-      <div className="explore-header">
-        <h2>{getTitle()}</h2>
-      </div>
+      <h2>
+        {searchTerm
+          ? `Results for “${searchTerm}”`
+          : category
+          ? category
+          : "Explore"}
+      </h2>
 
-      {loading && items.length === 0 ? (
-        <div className="explore-loading">Loading...</div>
-      ) : error ? (
-        <div className="explore-error">{error}</div>
-      ) : items.length > 0 ? (
+      {/* SEARCH RESULTS */}
+      {items.length > 0 && (
+        <div className="explore-grid">
+          {items.map((item) => (
+            <BookSummaryCard key={item.id} summary={item} />
+          ))}
+        </div>
+      )}
+
+      {/* EMPTY SEARCH STATE */}
+      {showEmptySearch && (
+        <div className="explore-empty">
+          <h3>No results found for “{searchTerm}”</h3>
+          <p>
+            We couldn’t find any content matching your search.
+            Try a different keyword or explore related content below.
+          </p>
+        </div>
+      )}
+
+      {hasMore && <div ref={sentinelRef} className="explore-sentinel" />}
+
+      {loading && <div className="explore-loading">Loading…</div>}
+
+      {/* RELATED CONTENT */}
+      {searchTerm && related.length > 0 && (
         <>
-          <div className="explore-grid">
-            {items.map((it) => (
-              <BookSummaryCard key={it.id} summary={it} />
+          <h3 className="explore-related-title">Related content</h3>
+          <div className="explore-grid explore-related">
+            {related.map((item) => (
+              <BookSummaryCard key={`rel-${item.id}`} summary={item} />
             ))}
           </div>
-          {hasMore && <div ref={sentinelRef} className="explore-sentinel" />}
-          {loading && <div className="explore-loading">Loading more...</div>}
         </>
-      ) : (
-        <div className="explore-empty">No items found.</div>
       )}
     </div>
   );

@@ -156,6 +156,9 @@ const fetchTopCategories = async (limit = 50) => {
 };
 
 const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQuery = '' }) => {
+  // Site origin used for constructing canonical review links in JSON-LD
+  const SITE_ORIGIN = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : 'https://your-onjo-app.netlify.app';
+
   const [loadingGlobal, setLoadingGlobal] = useState(true);
 
   const [globalContent, setGlobalContent] = useState({
@@ -544,22 +547,22 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
   const buildSeeMoreText = ({ sortKey = 'newest', category = null, tag = null } = {}) => {
     const sortMap = {
-      newest: 'Newest Content',
-      likes: 'Most Liked content',
-      rating: 'Most Rated Content',
-      views: 'Most Viewed Content',
+      newest: 'Newest Reviews',
+      likes: 'Most Liked Reviews',
+      rating: 'Highest Rated Reviews',
+      views: 'Most Viewed Reviews',
     };
-    const base = sortMap[sortKey] || 'more content';
-    if (tag) return `Explore More From ${base} In "${tag}"`;
-    if (category) return `Explore More From ${base} In ${category}`;
-    return `Explore More From ${base}`;
+    const base = sortMap[sortKey] || 'more reviews';
+    if (tag) return `Explore more ${base} related to "${tag}"`;
+    if (category) return `Explore more ${base} in ${category}`;
+    return `Explore more ${base}`;
   };
 
-  const SeeMoreCTA = ({ href, text }) => {
+  const SeeMoreCTA = ({ href, text, ariaLabel }) => {
     if (!href) return null;
     return (
       <div className="see-more-wrapper" aria-hidden={false}>
-        <a href={href} className="see-more-btn" role="button">
+        <a href={href} className="see-more-btn" role="button" rel="noopener noreferrer" aria-label={ariaLabel || text}>
           {text}
         </a>
       </div>
@@ -613,17 +616,129 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
   const isForYou = selectedCategory === 'For You' || selectedCategory === 'All';
 
+  // ----- SEO: generate and inject JSON-LD for search engines
+  const generateJsonLd = useCallback(() => {
+    try {
+      const lists = [];
+      // helper to transform items into schema list elements
+      const makeItemListElement = (items = [], name = 'Reviews') => {
+        const max = Math.min(items.length, 10);
+        const itemListElement = [];
+        for (let i = 0; i < max; i += 1) {
+          const it = items[i];
+          if (!it) continue;
+          const slugOrId = it.slug ? it.slug : String(it.id);
+          const url = `${SITE_ORIGIN}/review/${encodeURIComponent(slugOrId)}`;
+          itemListElement.push({
+            "@type": "ListItem",
+            position: i + 1,
+            url,
+            name: it.title || `Review ${slugOrId}`,
+            image: it.image_url || undefined,
+            description: it.description || undefined,
+          });
+        }
+        if (itemListElement.length === 0) return null;
+        return {
+          "@type": "ItemList",
+          name,
+          itemListElement,
+        };
+      };
+
+      // global lists
+      if (globalContent?.newest?.length) {
+        const el = makeItemListElement(globalContent.newest, 'Newest Reviews');
+        if (el) lists.push(el);
+      }
+      if (globalContent?.mostLiked?.length) {
+        const el = makeItemListElement(globalContent.mostLiked, 'Most Liked Reviews');
+        if (el) lists.push(el);
+      }
+      if (globalContent?.highestRated?.length) {
+        const el = makeItemListElement(globalContent.highestRated, 'Highest Rated Reviews');
+        if (el) lists.push(el);
+      }
+      if (globalContent?.mostViewed?.length) {
+        const el = makeItemListElement(globalContent.mostViewed, 'Most Viewed Reviews');
+        if (el) lists.push(el);
+      }
+
+      // categories
+      (loadedCategoryBlocks || []).forEach((blk) => {
+        if (!blk) return;
+        const nameBase = blk.category ? String(blk.category) : 'Category';
+        const elN = makeItemListElement(blk.newest, `Newest in ${nameBase}`);
+        if (elN) lists.push(elN);
+      });
+
+      if (lists.length === 0) return null;
+
+      // top-level web page schema
+      const json = {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "url": SITE_ORIGIN + (typeof window !== 'undefined' ? window.location.pathname : '/'),
+        "name": "ONJO Reviews — Product Reviews & Recommendations",
+        "description": "ONJO Reviews provides honest product reviews and recommendation lists for tech products, software, and gadgets.",
+        "mainEntity": lists,
+      };
+
+      return JSON.stringify(json);
+    } catch (err) {
+      console.warn('generateJsonLd error', err);
+      return null;
+    }
+  }, [SITE_ORIGIN, globalContent, loadedCategoryBlocks]);
+
+  useEffect(() => {
+    const jsonld = generateJsonLd();
+    const id = 'onjo-jsonld-contentfeed';
+    if (!jsonld) {
+      const existing = document.getElementById(id);
+      if (existing) existing.remove();
+      return;
+    }
+    let script = document.getElementById(id);
+    if (!script) {
+      script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.id = id;
+      document.head.appendChild(script);
+    }
+    script.text = jsonld;
+    return () => {
+      /* keep script in DOM for crawlers — update logic will replace text when needed */
+    };
+  }, [generateJsonLd]);
+
   return (
     <div className="content-feed-root" ref={rootRef}>
+      {/* Hidden H1 to help crawlers index this page for search queries */}
+      <h1
+        style={{
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          padding: 0,
+          margin: '-1px',
+          overflow: 'hidden',
+          clip: 'rect(0,0,0,0)',
+          border: 0,
+        }}
+      >
+        ONJO Reviews — Honest product reviews and recommendations for tech, software, and gadgets
+      </h1>
+
       <section
         className="intro-banner"
         role="region"
-        aria-label="Mission statement"
+        aria-label="ONJO Reviews mission"
         aria-live="polite"
       >
         <div className="intro-banner-inner">
           <div className="intro-banner-icon" aria-hidden="true">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" role="img">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" role="img" aria-hidden="true">
               <path d="M3 6c0 6 4 10 9 12 5-2 9-6 9-12-4 0-7 3-9 3S7 6 3 6z" fill="white" opacity="0.15" />
               <path d="M12 2c-.9 1.3-3.6 3.1-8 3v2c4.2 0 7 2 8 3 1-1 3.8-3 8-3V5c-4.4 0-7.1-1.7-8-3z" fill="white" opacity="0.08" />
             </svg>
@@ -631,15 +746,15 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
           <div className="intro-banner-text">
             <div className="intro-banner-title">
-              ONJO TECH
+              ONJO Reviews
             </div>
             <div className="intro-banner-subtitle">
-              Empowering innovators with actionable knowledge in electronics, programming, AI, cybersecurity, and more.
+              Honest product reviews and recommendations to help people make better buying decisions on tech, gadgets, and software.
             </div>
           </div>
 
           <div className="intro-banner-cta">
-            <a className="btn-mini" href="/about" title="Learn more about our mission">Learn more</a>
+            <a className="btn-mini" href="/about" title="Learn more about ONJO Reviews mission" aria-label="Learn more about ONJO Reviews mission">Learn more</a>
           </div>
         </div>
       </section>
@@ -648,9 +763,9 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
           {availableTags.length === 0 ? (
             (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? (
-              <div className="hf-loading">No tags for this category.</div>
+              <div className="hf-loading" role="status" aria-live="polite">No tags for this category.</div>
             ) : (
-              <div className="hf-loading">Loading tags…</div>
+              <div className="hf-loading" role="status" aria-live="polite">Loading tags…</div>
             )
           ) : (
             availableTags.map((tag) => {
@@ -662,7 +777,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
                   onClick={() => toggleTag(tag)}
                   aria-pressed={active}
                   type="button"
-                  title={`Filter by ${tag}`}
+                  title={`Filter reviews by ${tag}`}
                 >
                   {tag}
                 </button>
@@ -673,18 +788,19 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {selectedTags.length > 0 && (
-            <button className="hf-btn" type="button" onClick={clearTags}>Clear tags ({selectedTags.length})</button>
+            <button className="hf-btn" type="button" onClick={clearTags} aria-label={`Clear selected tags (${selectedTags.length})`}>Clear tags ({selectedTags.length})</button>
           )}
         </div>
       </div>
 
       {selectedTags.length > 0 && (
-        <section className="feed-section">
+        <section className="feed-section" aria-labelledby="tag-results-heading">
           <HorizontalCarousel
-            title={`Tag: ${selectedTags[0]}`}
+            title={`Tag: ${selectedTags[0]} — Reviews`}
             items={taggedResults || []}
             loading={taggedLoading}
             skeletonCount={6}
+            aria-label={`Carousel of reviews tagged ${selectedTags[0]}`}
           >
             {renderCards(taggedResults || [], 'newest')}
           </HorizontalCarousel>
@@ -692,17 +808,19 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
           <SeeMoreCTA
             href={buildViewAllLink('newest', (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, selectedTags[0])}
             text={buildSeeMoreText({ sortKey: 'newest', category: (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, tag: selectedTags[0] })}
+            ariaLabel={`Explore more reviews tagged ${selectedTags[0]}`}
           />
         </section>
       )}
 
       {searchQuery && searchQuery.trim() && (
-        <section className="feed-section">
+        <section className="feed-section" aria-labelledby="search-results-heading">
           <HorizontalCarousel
-            title={`Search results for "${searchQuery}"`}
+            title={`Search results for "${searchQuery}" — Reviews`}
             items={globalContent.newest}
             loading={loadingGlobal}
             skeletonCount={6}
+            aria-label={`Search results carousel for ${searchQuery}`}
           >
             {renderCards(globalContent.newest, 'newest')}
           </HorizontalCarousel>
@@ -710,6 +828,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
           <SeeMoreCTA
             href={`/explore?q=${encodeURIComponent(searchQuery)}`}
             text={`Explore more results for "${searchQuery}"`}
+            ariaLabel={`Explore more results for ${searchQuery}`}
           />
         </section>
       )}
@@ -718,20 +837,21 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         <div key={loadedCategoryBlocks[0].category}>
           {['newest', 'mostLiked', 'highestRated', 'mostViewed'].map((k) => {
             const titleMap = {
-              newest: `Newest in ${loadedCategoryBlocks[0].category}`,
-              mostLiked: `Most Liked in ${loadedCategoryBlocks[0].category}`,
-              highestRated: `Most Rated in ${loadedCategoryBlocks[0].category}`,
-              mostViewed: `Most Viewed in ${loadedCategoryBlocks[0].category}`,
+              newest: `Newest in ${loadedCategoryBlocks[0].category} — Reviews`,
+              mostLiked: `Most Liked in ${loadedCategoryBlocks[0].category} — Reviews`,
+              highestRated: `Highest Rated in ${loadedCategoryBlocks[0].category} — Reviews`,
+              mostViewed: `Most Viewed in ${loadedCategoryBlocks[0].category} — Reviews`,
             };
             const items = loadedCategoryBlocks[0][k];
             const sortKey = k === 'newest' ? 'newest' : (k === 'mostLiked' ? 'likes' : (k === 'highestRated' ? 'rating' : 'views'));
             return (
-              <section className="feed-section" key={k}>
+              <section className="feed-section" key={k} aria-labelledby={`cat-${k}-heading`}>
                 <HorizontalCarousel
                   title={titleMap[k]}
                   items={items}
                   loading={loadingGlobal}
                   skeletonCount={6}
+                  aria-label={titleMap[k]}
                 >
                   {renderCards(items, sortKey)}
                 </HorizontalCarousel>
@@ -739,6 +859,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
                 <SeeMoreCTA
                   href={buildViewAllLink(sortKey, loadedCategoryBlocks[0].category)}
                   text={buildSeeMoreText({ sortKey, category: loadedCategoryBlocks[0].category })}
+                  ariaLabel={`Explore more ${sortKey} reviews in ${loadedCategoryBlocks[0].category}`}
                 />
               </section>
             );
@@ -748,12 +869,13 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
       {isForYou && !searchQuery && (
         <>
-          <section className="feed-section">
+          <section className="feed-section" aria-labelledby="global-newest-heading">
             <HorizontalCarousel
-              title="Newest"
+              title="Newest Reviews"
               items={globalContent.newest}
               loading={loadingGlobal}
               skeletonCount={6}
+              aria-label="Newest product reviews carousel"
             >
               {renderCards(globalContent.newest, 'newest')}
             </HorizontalCarousel>
@@ -761,15 +883,17 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
             <SeeMoreCTA
               href={buildViewAllLink('newest', null)}
               text={buildSeeMoreText({ sortKey: 'newest' })}
+              ariaLabel="Explore more newest reviews"
             />
           </section>
 
-          <section className="feed-section">
+          <section className="feed-section" aria-labelledby="global-mostliked-heading">
             <HorizontalCarousel
-              title="Most Liked"
+              title="Most Liked Reviews"
               items={globalContent.mostLiked}
               loading={loadingGlobal}
               skeletonCount={6}
+              aria-label="Most liked product reviews carousel"
             >
               {renderCards(globalContent.mostLiked, 'likes')}
             </HorizontalCarousel>
@@ -777,15 +901,17 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
             <SeeMoreCTA
               href={buildViewAllLink('likes', null)}
               text={buildSeeMoreText({ sortKey: 'likes' })}
+              ariaLabel="Explore more most-liked reviews"
             />
           </section>
 
-          <section className="feed-section">
+          <section className="feed-section" aria-labelledby="global-highestrated-heading">
             <HorizontalCarousel
-              title="Most Rated"
+              title="Highest Rated Reviews"
               items={globalContent.highestRated}
               loading={loadingGlobal}
               skeletonCount={6}
+              aria-label="Highest rated product reviews carousel"
             >
               {renderCards(globalContent.highestRated, 'rating')}
             </HorizontalCarousel>
@@ -793,15 +919,17 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
             <SeeMoreCTA
               href={buildViewAllLink('rating', null)}
               text={buildSeeMoreText({ sortKey: 'rating' })}
+              ariaLabel="Explore more highest-rated reviews"
             />
           </section>
 
-          <section className="feed-section">
+          <section className="feed-section" aria-labelledby="global-mostviewed-heading">
             <HorizontalCarousel
-              title="Most Viewed"
+              title="Most Viewed Reviews"
               items={globalContent.mostViewed}
               loading={loadingGlobal}
               skeletonCount={6}
+              aria-label="Most viewed product reviews carousel"
             >
               {renderCards(globalContent.mostViewed, 'views')}
             </HorizontalCarousel>
@@ -809,6 +937,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
             <SeeMoreCTA
               href={buildViewAllLink('views', null)}
               text={buildSeeMoreText({ sortKey: 'views' })}
+              ariaLabel="Explore more most-viewed reviews"
             />
           </section>
 
@@ -818,12 +947,13 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
                 <h3 className="cat-title">{block.category}</h3>
               </div>
 
-              <section className="feed-section">
+              <section className="feed-section" aria-labelledby={`newest-${block.category}-heading`}>
                 <HorizontalCarousel
-                  title={`Newest in ${block.category}`}
+                  title={`Newest in ${block.category} — Reviews`}
                   items={block.newest}
                   loading={loadingGlobal}
                   skeletonCount={4}
+                  aria-label={`Newest reviews in ${block.category}`}
                 >
                   {renderCards(block.newest, 'newest')}
                 </HorizontalCarousel>
@@ -831,15 +961,17 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
                 <SeeMoreCTA
                   href={buildViewAllLink('newest', block.category)}
                   text={buildSeeMoreText({ sortKey: 'newest', category: block.category })}
+                  ariaLabel={`Explore more newest reviews in ${block.category}`}
                 />
               </section>
 
-              <section className="feed-section">
+              <section className="feed-section" aria-labelledby={`likes-${block.category}-heading`}>
                 <HorizontalCarousel
-                  title={`Most Liked in ${block.category}`}
+                  title={`Most Liked in ${block.category} — Reviews`}
                   items={block.mostLiked}
                   loading={loadingGlobal}
                   skeletonCount={4}
+                  aria-label={`Most liked reviews in ${block.category}`}
                 >
                   {renderCards(block.mostLiked, 'likes')}
                 </HorizontalCarousel>
@@ -847,15 +979,17 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
                 <SeeMoreCTA
                   href={buildViewAllLink('likes', block.category)}
                   text={buildSeeMoreText({ sortKey: 'likes', category: block.category })}
+                  ariaLabel={`Explore more most-liked reviews in ${block.category}`}
                 />
               </section>
 
-              <section className="feed-section">
+              <section className="feed-section" aria-labelledby={`rating-${block.category}-heading`}>
                 <HorizontalCarousel
-                  title={`Highest Rated in ${block.category}`}
+                  title={`Highest Rated in ${block.category} — Reviews`}
                   items={block.highestRated}
                   loading={loadingGlobal}
                   skeletonCount={4}
+                  aria-label={`Highest rated reviews in ${block.category}`}
                 >
                   {renderCards(block.highestRated, 'rating')}
                 </HorizontalCarousel>
@@ -863,15 +997,17 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
                 <SeeMoreCTA
                   href={buildViewAllLink('rating', block.category)}
                   text={buildSeeMoreText({ sortKey: 'rating', category: block.category })}
+                  ariaLabel={`Explore more highest-rated reviews in ${block.category}`}
                 />
               </section>
 
-              <section className="feed-section">
+              <section className="feed-section" aria-labelledby={`views-${block.category}-heading`}>
                 <HorizontalCarousel
-                  title={`Most Viewed in ${block.category}`}
+                  title={`Most Viewed in ${block.category} — Reviews`}
                   items={block.mostViewed}
                   loading={loadingGlobal}
                   skeletonCount={4}
+                  aria-label={`Most viewed reviews in ${block.category}`}
                 >
                   {renderCards(block.mostViewed, 'views')}
                 </HorizontalCarousel>
@@ -879,15 +1015,16 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
                 <SeeMoreCTA
                   href={buildViewAllLink('views', block.category)}
                   text={buildSeeMoreText({ sortKey: 'views', category: block.category })}
+                  ariaLabel={`Explore more most-viewed reviews in ${block.category}`}
                 />
               </section>
             </section>
           ))}
 
           <div ref={sentinelRef} style={{ height: 1, width: '100%' }} aria-hidden="true" />
-          {loadingCategories && <div className="categories-loading">Loading more categories...</div>}
+          {loadingCategories && <div className="categories-loading" role="status" aria-live="polite">Loading more categories...</div>}
           {!hasMoreCategories && !loadingCategories && loadedCategoryBlocks.length > 0 && (
-            <div className="categories-end">You've reached the end of the line.</div>
+            <div className="categories-end" role="status" aria-live="polite">You've reached the end of the line.</div>
           )}
         </>
       )}

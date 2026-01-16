@@ -5,7 +5,7 @@ import { ChevronDown } from 'lucide-react';
 const Header = () => (
   <header className="header">
     <div className="header-container">
-      <h1 className="header-title">ONJO TECH</h1>
+      <h1 className="header-title">ONJO Reviews</h1>
     </div>
   </header>
 );
@@ -14,7 +14,7 @@ const Header = () => (
 const Footer = () => (
   <footer className="footer">
     <div className="footer-container">
-      <p>&copy; {new Date().getFullYear()} ONJO TECH. All rights reserved.</p>
+      <p>&copy; {new Date().getFullYear()} ONJO Reviews. All rights reserved.</p>
     </div>
   </footer>
 );
@@ -54,24 +54,29 @@ const AccordionContent = ({ children }) => <div className="accordion-content">{c
 const FAQ = () => {
   const faqs = [
     {
-      question: "What is ONJO TECH?",
-      answer: "ONJO TECH is a technology and innovation knowledge platform providing clear explanations on electronics, telecommunications, programming, AI, cybersecurity, and emerging technologies."
+      question: "What is ONJO Reviews?",
+      answer:
+        "ONJO Reviews is a product review and recommendation platform designed to help people make confident buying decisions through clear insights, comparisons, and real-world use cases."
     },
     {
-      question: "Is ONJO TECH free to use?",
-      answer: "Yes! Our platform is freely accessible. We sustain ONJO TECH through partnerships that align with our mission of open education and knowledge sharing."
+      question: "Is ONJO Reviews free to use?",
+      answer:
+        "Yes. All reviews and guides on ONJO Reviews are freely accessible. The platform is supported through partnerships that allow us to keep content available at no cost to users."
     },
     {
-      question: "Can I download content from ONJO TECH?",
-      answer: "Most of our learning resources are designed for online exploration to provide interactive experiences. Some PDF guides and tutorials may be available for download."
+      question: "How do you choose which products to review?",
+      answer:
+        "Products are selected based on relevance, demand, and usefulness. Reviews focus on practical value, usability, strengths, limitations, and how well each product fits specific needs."
     },
     {
-      question: "How often is new content added?",
-      answer: "New content is published weekly, covering electronics, AI, programming, cybersecurity, and other technology fields."
+      question: "How often is new content published?",
+      answer:
+        "New reviews, comparisons, and buying guides are published regularly as products evolve and new tools become available."
     },
     {
-      question: "Who is ONJO TECH for?",
-      answer: "ONJO TECH is for learners, developers, engineers, educators, and technology enthusiasts seeking practical, structured knowledge to build and innovate."
+      question: "Who is ONJO Reviews for?",
+      answer:
+        "ONJO Reviews is for anyone researching products before buying—whether you're an everyday buyer, professional, creator, or someone comparing options to make an informed decision."
     }
   ];
 
@@ -108,12 +113,12 @@ const FAQ = () => {
 
       <div className="faq-page-container">
         <Header />
-        
+
         <main className="main-content">
           <div className="hero-section">
             <h1 className="page-title">Frequently Asked Questions</h1>
             <p className="page-subtitle">
-              Get clear answers on ONJO TECH's learning platform, technology categories, and how to navigate our resources.
+              Clear answers about ONJO Reviews, how we evaluate products, and how to use the platform.
             </p>
           </div>
 
@@ -132,7 +137,7 @@ const FAQ = () => {
 
           <div className="contact-cta-section">
             <p className="contact-cta-text">Still have questions?</p>
-            <a href="/contact" className="contact-link">Connect with our team</a>
+            <a href="/contact" className="contact-link">Contact us</a>
           </div>
         </main>
 
