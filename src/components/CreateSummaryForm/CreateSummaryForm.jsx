@@ -38,25 +38,28 @@ Quill.register("modules/clipboard", CustomClipboard, true);
 
 
 const categories = [
-  "Programming & Software Engineering",
-  "Artificial Intelligence & Machine Learning",
-  "Cybersecurity",
-  "Computer Science Fundamentals",
-  "Data Science & Analytics",
-  "Cloud Computing & DevOps",
-  "Electronics & Embedded Systems",
-  "Telecommunications",
-  "Networking & Infrastructure",
-  "Internet of Things (IoT)",
-  "Robotics & Automation",
-  "Operating Systems & Virtualization",
-  "System Design & Architecture",
-  "Software Testing & Quality Assurance",
-  "Blockchain & Web3",
-  "Quantum Computing",
-  "Video Insights",
-  "AR / VR / XR Technologies"
+  "Kitchen & Cooking",
+  "Home & Garden",
+  "Electronics & Tech",
+  "Health & Fitness",
+  "Health & Wellness",
+  "Beauty & Personal Care",
+  "Baby & Kids",
+  "Sports & Outdoors",
+  "Pet Supplies",
+  "Automotive",
+  "Office & Stationery",
+  "Finance & Money Management",
+  "Technology & Smart Devices",
+  "Travel Essentials & Adventure",
+  "Education & Learning Tools",
+  "DIY & Home Projects",
+  "Lifestyle & Personal Growth",
+  "Business & Entrepreneurship Tools",
+  "Parenting & Family Life",
+  "Cooking & Recipe Resources"
 ];
+
 
 
 const CreateSummaryForm = ({ onClose, onNewSummary }) => {
