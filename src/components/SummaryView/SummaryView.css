@@ -463,44 +463,15 @@ html {
   color: transparent;
 }
 
-
 .summary-body a {
-  color: #28a745; /* Green for affiliate/action links, or #007bff for blue */
-  text-decoration: none; /* No underline by default */
-  font-weight: 600; /* Slightly bolder to draw eye */
-  border-bottom: 1px solid transparent; /* Subtle underline potential */
-  transition: all 0.2s ease; /* Smooth hover */
+  color: #1a5fb4;          /* soft editorial blue */
+  font-weight: 650;        /* normal weight */
+  font-style: normal;      /* no italic */
+  text-decoration: underline;   /* no underline */
 }
 
 .summary-body a:hover {
   text-decoration: underline;
-  border-bottom-color: #28a745; /* Matches color on hover */
-  background-color: rgba(40, 167, 69, 0.1); /* Light highlight bg */
-}
-
-.summary-body a::after {
-  content: ' ↗'; /* Small arrow icon to signal "external/action" */
-  font-size: 0.8em;
-  opacity: 0.7;
-}
-
-.summary-body a:hover::after {
-  opacity: 1;
-}
-
-.summary-body a {
-  color: #28a745 !important;        /* Green for visibility */
-  font-weight: bold !important;     /* Bold */
-  font-style: italic !important;    /* Italic for extra emphasis */
-  font-size: 1.1em;                 /* Slightly larger */
-  font-family: 'Inter', sans-serif; /* Clean, fast-to-read font */
-  text-decoration: none;
-  transition: color 0.2s ease, transform 0.2s ease;
-}
-
-.summary-body a:hover {
-  color: #218838 !important;        /* Darker green on hover */
-  transform: scale(1.03);           /* Small zoom effect */
 }
 /* WRAPPER */
 .youtube-embed {
