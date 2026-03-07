@@ -8,3 +8,9 @@
   command = "npm run dev"
   port = 8081         # Netlify proxy
   targetPort = 8082   # Actual Vite server (based on your logs)
+
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
