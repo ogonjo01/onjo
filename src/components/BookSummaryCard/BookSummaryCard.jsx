@@ -65,7 +65,7 @@ const BookSummaryCard = ({ summary = {} }) => {
   const authorDisplay = (author || initialAuthor || 'Unknown').trim();
   const previewSource = (description || initialText || '').trim();
   const displayImage = (image_url || initialImage || '').trim();
-  const summaryPath = slug ? `/summary/${slug}` : `/summary/${id}`;
+  const summaryPath = slug ? `/review/${slug}` : `/review/${id}`;
 
   const cleanText = (text, maxLength = 140) => {
     const src = String(text || '');
