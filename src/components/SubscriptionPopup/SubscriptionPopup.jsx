@@ -9,7 +9,6 @@ const SubscriptionPopup = ({ onClose }) => {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
-  // Close popup on Escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') handleClose();
@@ -19,7 +18,7 @@ const SubscriptionPopup = ({ onClose }) => {
   }, []);
 
   const handleClose = () => {
-    localStorage.setItem('popupDismissedAt', Date.now()); // Store dismissal timestamp
+    localStorage.setItem('popupDismissedAt', Date.now());
     onClose();
   };
 
@@ -43,10 +42,10 @@ const SubscriptionPopup = ({ onClose }) => {
       try { data = await response.json(); } catch (err) {}
 
       if (response.ok) {
-        setMessage('🎉 Subscribed! Check your inbox for your first chapter.');
-        localStorage.setItem('subscribedAt', Date.now()); // Store subscription timestamp
+        setMessage('🎉 You\'re in! Expect fresh reviews delivered to your inbox.');
+        localStorage.setItem('subscribedAt', Date.now());
         setEmail('');
-        setTimeout(handleClose, 3000); // Auto-close after success
+        setTimeout(handleClose, 3000);
       } else {
         setError('Oops! ' + (data?.message || 'Try again.'));
       }
@@ -79,15 +78,15 @@ const SubscriptionPopup = ({ onClose }) => {
         </button>
 
         <div className="sp-popup-content">
-          <h2 className="sp-popup-title">Where Ambition Collides with Emotion</h2> {/* Refined Nov 05, 2025: Echo draft tagline for instant hook */}
-          <p className="sp-popup-sub">Get entrepreneurial romance novels — tales of empires, heartbreaks, and raw rebuilds — monthly, free!</p> {/* Refined: From products/guides to novels/ambition-emotion; keywords for SEO */}
+          <h2 className="sp-popup-title">Make Smarter Buying Decisions</h2>
+          <p className="sp-popup-sub">Get the latest product reviews, comparisons, and buying guides — delivered straight to your inbox, free.</p>
 
           <ul className="sp-popup-benefits">
-            <li><Check size={16} /> Heart-racing opening chapters</li> {/* Refined: From reviews to story immersion */}
-            <li><Check size={16} /> Reflections on power's fragile edge</li> {/* Refined: Draft's "what we lose," "loyalty fractures" */}
-            <li><Check size={16} /> Teasers of forbidden passions</li> {/* Refined: Draft's "business...passion" */}
-            <li><Check size={16} /> Insights into betrayal's ache</li> {/* Refined: Direct from draft's "ache of betrayal" */}
-            <li><Check size={16} /> Prompts for your own empire chase</li> {/* Refined: Ties to "hunger for greatness," "chasing dreams" */}
+            <li><Check size={16} /> In-depth reviews on tech, software & AI tools</li>
+            <li><Check size={16} /> Side-by-side comparisons to clarify your choices</li>
+            <li><Check size={16} /> Buying guides tailored to real-world needs</li>
+            <li><Check size={16} /> Honest pros & cons — no fluff, no bias</li>
+            <li><Check size={16} /> Early access to new reviews and features</li>
           </ul>
 
           <form onSubmit={submit} className="sp-popup-form">
@@ -95,13 +94,13 @@ const SubscriptionPopup = ({ onClose }) => {
               <Mail size={18} className="sp-popup-icon" />
               <input
                 type="email"
-                placeholder="your.empire@email.com"
+                placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
                 className="sp-popup-input"
-              /> {/* Refined: Placeholder evokes aspiration, draft's "build empires" */}
+              />
             </div>
 
             <button
@@ -109,7 +108,7 @@ const SubscriptionPopup = ({ onClose }) => {
               disabled={loading}
               className="sp-popup-submit"
             >
-              {loading ? 'Subscribing...' : 'Awaken Your Story'} {/* Refined: From "Get Free Guides" to mission's "awaken...soul" */}
+              {loading ? 'Subscribing...' : 'Get Free Reviews'}
             </button>
           </form>
 
@@ -118,10 +117,10 @@ const SubscriptionPopup = ({ onClose }) => {
 
           <div className="sp-popup-testimonial">
             <Star size={16} className="sp-popup-star" />
-            <p>“These tales scarred and rebuilt my dreams — fiction that breathes.” — Alex, Dreamer</p> {/* Refined: From gadget savings to emotional resonance; role to draft's "dreamers" */}
+            <p>"ONJO Reviews saved me hours of research — clear, honest, and straight to the point." — James, Product Manager</p>
           </div>
 
-          <p className="sp-popup-legal">No spoilers • Unsubscribe anytime</p> {/* Refined: Playful fiction nod, from "No spam" */}
+          <p className="sp-popup-legal">No spam • Unsubscribe anytime</p>
         </div>
       </motion.div>
     </motion.div>
