@@ -1,299 +1,218 @@
 // netlify/functions/review-adviser.js
-// AI Adviser for ONJO Reviews — powered by Claude claude-haiku-4-5-20251001
-// Modes: chat | news | trending | recommendations | seo
-//
-// NEWS mode uses Anthropic web_search tool so it pulls LIVE stories,
-// then tells you exactly what reviews to write — same as OGONJO's Marcus news mode.
+// ONJO Reviews AI Adviser — powered by Google Gemini (matches ai-advisor.js pattern)
+// Modes: chat | trending | recommendations | seo | news
 
-const MODEL      = 'claude-haiku-4-5-20251001';
-const MAX_TOKENS = 1200;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const MODEL          = 'gemini-2.0-flash';
+const GEMINI_BASE    = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+// Simple in-memory cache (resets on cold start)
 const cache = new Map();
 const CACHE_TTL = {
-  news:            2 * 60 * 60 * 1000,
-  trending:        6 * 60 * 60 * 1000,
-  recommendations: 6 * 60 * 60 * 1000,
-  seo:             6 * 60 * 60 * 1000,
+  trending:        6  * 60 * 60 * 1000,
+  recommendations: 6  * 60 * 60 * 1000,
+  seo:             12 * 60 * 60 * 1000,
+  news:            2  * 60 * 60 * 1000,
 };
 
-const getCached = (key, ttl) => {
-  const hit = cache.get(key);
-  if (!hit) return null;
-  if (Date.now() - hit.ts > ttl) { cache.delete(key); return null; }
-  return hit.value;
-};
-const setCached = (key, value) => cache.set(key, { value, ts: Date.now() });
+const SYSTEM_PROMPTS = {
+  chat: `You are an expert product review strategist and content coach for ONJO Reviews, a product review platform.
+You help content creators write better, more trustworthy, and more SEO-effective product reviews.
+Be concise, practical, and specific. Use bullet points and structure when helpful.
+Focus on: review structure, verdict writing, affiliate strategy, reader trust, SEO, and content quality.`,
 
-const extractText = (content = []) => {
-  const parts = [];
-  for (const block of content) {
-    if (block.type === 'text' && block.text) parts.push(block.text.trim());
-  }
-  return parts.join('\n\n') || 'No response generated.';
-};
+  trending: `You are a product trend analyst for ONJO Reviews.
+Identify trending product categories and specific products that review sites should be covering right now.
+Format your response with clear sections:
+## 🔥 Hot Categories Right Now
+## 📱 Specific Products to Review This Week
+## 📈 Rising Search Terms
+## ⚡ Quick Win Opportunities
+Be specific with product names, categories, and why they're trending. Keep it actionable.`,
 
-const SYSTEM = {
-  chat: `You are an expert content strategist and product review specialist for ONJO Reviews,
-a product review and recommendation platform. Your name is ONJO Adviser.
-You help the review team write compelling reviews, structure content, improve SEO,
-decide what to review next, and craft affiliate-friendly copy that converts.
-Keep responses concise, practical, and actionable. Use bullet points for lists.`,
+  recommendations: `You are a content strategy advisor for ONJO Reviews, a product review platform.
+Suggest specific review content ideas that fill gaps and drive traffic.
+Format your response with clear sections:
+## 💡 High-Opportunity Review Topics
+## 🔍 Underserved Niches
+## 📊 Comparison Posts to Write
+## 🎯 Buyer Intent Keywords to Target
+Be specific, actionable, and focused on what will drive search traffic and affiliate conversions.`,
 
-  news: `You are a product news analyst for ONJO Reviews with access to web search.
+  seo: `You are an SEO expert specializing in product review websites.
+Give specific, actionable SEO advice for ONJO Reviews content creators.
+Format your response with clear sections:
+## 🏆 Title & Headline Optimization
+## 🔍 Schema Markup for Reviews
+## 📌 Featured Snippet Strategies
+## 🔗 Internal Linking for Review Sites
+## 📊 Keyword Targeting Tips
+Focus on practical tactics that improve rankings for "best X" and "X review" queries.`,
 
-Your job:
-1. Search the web for the LATEST news about new product launches, new software releases,
-   new apps, new AI tools, new gadgets, new services — what is happening RIGHT NOW.
-2. From those real, live news stories — tell the ONJO Reviews team exactly what 
-   they should write reviews about this week.
-
-ALWAYS use the web_search tool first. Search for current product launches and news.
-Only report products and stories you actually found via search. Never invent anything.
-
-Format your response EXACTLY like this:
-
+  news: `You are a product news analyst for ONJO Reviews.
+Search for and summarize the latest product launches, consumer tech news, and trending items that a product review site should cover.
+Format your response with clear sections:
 ## 📰 What's Happening Right Now
-[2-3 sentences summarising the biggest product/tech news from your search]
-
-## 🎯 Reviews You Should Write This Week
-1. **[Exact product/app/tool name]** — [What it is + why readers want to know about it now]
-   → Suggested title: "[SEO-optimised review title]"
-   → Angle: [The specific review angle that will rank and convert]
-
-2. **[Product name]** — [same format]
-   → Suggested title: "..."
-   → Angle: ...
-
-(Give 5-7 items based on real news you found)
-
-## ⚡ Quick-Hit Comparison Opportunities
-- **[Product A] vs [Product B]** — [Why this comparison is hot right now based on the news]
-(3 items)
-
-## 📌 Watch List — Pre-write Now Before Everyone Else
-- **[Upcoming product/launch]** — [Why get ahead of it]
-(2-3 items)
-
-Use the ACTUAL product names from your web search. Be specific. Be current.`,
-
-  trending: `You are a product trend analyst for ONJO Reviews. Surface what products,
-categories, and topics are trending RIGHT NOW that the team should be reviewing.
-
-## 🔥 Trending Now
-- [Product/category] — [why it's trending]
-(5-8 items)
-
-## 📈 About to Peak
-- [Product/category] — [why it's about to trend]
-(3-5 items)
-
-## 💡 Evergreen Opportunities
-- [Topic] — [why it always performs]
-(3 items)`,
-
-  recommendations: `You are a content gap analyst for ONJO Reviews. Recommend specific
-products and review topics to maximise organic traffic and affiliate revenue.
-
-## 💡 High-Priority Reviews to Write
-1. [Product name] — [search intent, competition level, affiliate potential]
-(5-7 recommendations)
-
-## 🎯 Category Deep-Dives
-- [Category] — [specific angle to cover]
-(3-4 ideas)
-
-## 🔗 Comparison Posts (High Converting)
-- [Product A] vs [Product B] — [why this drives traffic]
-(3 ideas)`,
-
-  seo: `You are an SEO specialist for product review websites. Give practical SEO advice for ONJO Reviews.
-
-## 🔍 Title & URL Optimization
-[Advice for review page titles and keyword patterns]
-
-## ⭐ Review Schema Markup
-[What structured data to implement and why]
-
-## 📝 Content Structure Tips
-[How to structure a review for featured snippets]
-
-## 🔗 Link Building for Review Sites
-[Specific tactics]
-
-## 🎯 Quick Wins
-- [Actionable tip]
-(4-5 bullet points)`,
+## ✍️ Reviews to Write This Week (with suggested SEO titles)
+## ⚔️ Hot Comparisons to Cover
+## 👀 Watch List — Coming Soon
+Be specific about actual products, brands, and why they matter for review content.`,
 };
 
-const NEWS_QUERIES = {
-  all:      'new product launches apps software tools gadgets announced released 2025',
-  tech:     'new tech gadgets smartphones devices hardware announced 2025',
-  software: 'new software apps SaaS platforms tools released 2025',
-  ai:       'new AI tools models products apps launched 2025',
-  home:     'new home appliances smart home gadgets products 2025',
-  fitness:  'new fitness equipment wearables health tech products 2025',
-  finance:  'new fintech apps financial tools investing products 2025',
-};
+async function callGemini(prompt, systemPrompt, useGrounding = false) {
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY environment variable is not set in Netlify.');
+  }
+
+  const body = {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
+  };
+
+  if (useGrounding) {
+    body.tools = [{ google_search: {} }];
+  }
+
+  const url = `${GEMINI_BASE}/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${errText}`);
+  }
+
+  const data = await res.json();
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
+}
+
+function getCached(key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > (CACHE_TTL[entry.mode] || 3600000)) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function setCached(key, value, mode) {
+  cache.set(key, { value, ts: Date.now(), mode });
+}
 
 exports.handler = async (event) => {
+  const headers = {
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type':                 'application/json',
+  };
+
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      },
-      body: '',
-    };
+    return { statusCode: 204, headers, body: '' };
   }
-
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  let body;
-  try { body = JSON.parse(event.body || '{}'); }
-  catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
-
-  const { mode = 'chat', message = '', customTopic = '', newsFilter = 'all' } = body;
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY not set.' }) };
+  let mode, message, customTopic;
+  try {
+    ({ mode, message, customTopic } = JSON.parse(event.body || '{}'));
+  } catch {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON body' }) };
   }
 
-  // Cache check
-  if (mode !== 'chat') {
-    const cacheKey = mode === 'news'
-      ? `news:${newsFilter}:${customTopic.toLowerCase().trim()}`
-      : `${mode}:${customTopic.toLowerCase().trim()}`;
-    const ttl = CACHE_TTL[mode] || 6 * 60 * 60 * 1000;
-    const cached = getCached(cacheKey, ttl);
-    if (cached) {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ result: cached, cached: true }),
-      };
-    }
+  if (!mode) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing mode parameter' }) };
   }
 
   try {
     let result;
 
+    if (mode === 'chat') {
+      const userMsg = (message || '').trim();
+      if (!userMsg) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Empty message' }) };
+      result = await callGemini(userMsg, SYSTEM_PROMPTS.chat, false);
+      return { statusCode: 200, headers, body: JSON.stringify({ result }) };
+    }
+
     if (mode === 'news') {
-      const baseQuery = NEWS_QUERIES[newsFilter] || NEWS_QUERIES.all;
-      const topicExtra = customTopic.trim() ? ` Focus specifically on: "${customTopic}".` : '';
-      const userMessage = `Search the web now for the latest news using this query: "${baseQuery}".${topicExtra}\n\nFind real current news about new product launches, new apps, new software, new tools. Then tell me exactly what product reviews I should write this week based on what you found.`;
-
-      let messages = [{ role: 'user', content: userMessage }];
-      let iterations = 0;
-
-      while (iterations < 6) {
-        iterations++;
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-beta': 'web-search-2025-03-05',
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            max_tokens: 1500,
-            system: SYSTEM.news,
-            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-            messages,
-          }),
-        });
-
-        if (!resp.ok) {
-          const errText = await resp.text();
-          console.error('News API error:', errText);
-          result = `Could not fetch live news (${resp.status}). Try refreshing.`;
-          break;
-        }
-
-        const data = await resp.json();
-        const { content, stop_reason } = data;
-        messages.push({ role: 'assistant', content });
-
-        if (stop_reason === 'end_turn') {
-          result = extractText(content);
-          break;
-        }
-
-        // tool_use blocks — return empty tool_result to continue the loop
-        const toolUses = content.filter(b => b.type === 'tool_use');
-        if (toolUses.length === 0) { result = extractText(content); break; }
-
-        messages.push({
-          role: 'user',
-          content: toolUses.map(tu => ({
-            type: 'tool_result',
-            tool_use_id: tu.id,
-            content: tu.output || '',
-          })),
-        });
-      }
-
-      if (!result) result = 'News search timed out. Please try again.';
-
-    } else {
-      // Standard call — no web search
-      let userMessage;
-      if (mode === 'chat') {
-        userMessage = message.trim() || 'Hello, what can you help me with?';
-      } else {
-        const topicLine = customTopic.trim()
-          ? `Focus specifically on: "${customTopic}".`
-          : 'Focus on general product review content opportunities.';
-        userMessage = `${topicLine}\n\nPlease provide your analysis now.`;
-      }
-
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: MAX_TOKENS,
-          system: SYSTEM[mode] || SYSTEM.chat,
-          messages: [{ role: 'user', content: userMessage }],
-        }),
-      });
-
-      if (!resp.ok) {
-        const errText = await resp.text();
-        console.error('Anthropic error:', errText);
-        return { statusCode: resp.status, body: JSON.stringify({ error: `API error: ${resp.status}` }) };
-      }
-
-      const data = await resp.json();
-      result = data?.content?.[0]?.text || 'No response generated.';
+      const topic    = (customTopic || message || 'consumer tech and new product launches').trim();
+      const cacheKey = `news:${topic}`;
+      const cached   = getCached(cacheKey);
+      if (cached) return { statusCode: 200, headers, body: JSON.stringify({ result: cached }) };
+      const prompt = `Search the web for the latest news about: "${topic}"
+Then give me a detailed breakdown for ONJO Reviews content creators:
+- What major products launched or were announced recently?
+- What product controversies or viral stories are circulating?
+- What are people searching for and buying right now in this space?
+- What specific review articles should we publish this week based on this news?
+Provide real, current information with specific product names and brands.`;
+      result = await callGemini(prompt, SYSTEM_PROMPTS.news, true);
+      setCached(cacheKey, result, 'news');
+      return { statusCode: 200, headers, body: JSON.stringify({ result }) };
     }
 
-    // Cache
-    if (mode !== 'chat') {
-      const cacheKey = mode === 'news'
-        ? `news:${newsFilter}:${customTopic.toLowerCase().trim()}`
-        : `${mode}:${customTopic.toLowerCase().trim()}`;
-      setCached(cacheKey, result);
+    if (mode === 'trending') {
+      const topic    = (customTopic || message || 'consumer products and tech gadgets').trim();
+      const cacheKey = `trending:${topic}`;
+      const cached   = getCached(cacheKey);
+      if (cached) return { statusCode: 200, headers, body: JSON.stringify({ result: cached }) };
+      const prompt = `What products and categories are trending right now for review content in the niche: "${topic}"?
+Provide specific product names, brands, search trends, and why they're hot.
+What should a product review site be publishing about this week to capture traffic?`;
+      result = await callGemini(prompt, SYSTEM_PROMPTS.trending, true);
+      setCached(cacheKey, result, 'trending');
+      return { statusCode: 200, headers, body: JSON.stringify({ result }) };
     }
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ result }),
-    };
+    if (mode === 'recommendations') {
+      const topic    = (customTopic || message || 'product reviews and buying guides').trim();
+      const cacheKey = `recommendations:${topic}`;
+      const cached   = getCached(cacheKey);
+      if (cached) return { statusCode: 200, headers, body: JSON.stringify({ result: cached }) };
+      const prompt = `Generate content ideas for a product review site focused on: "${topic}".
+What review articles, comparisons, and buying guides should they create to:
+1. Capture high buyer-intent search traffic
+2. Fill underserved content gaps
+3. Drive affiliate conversions
+4. Build topical authority
+Be specific with titles, product categories, and keyword opportunities.`;
+      result = await callGemini(prompt, SYSTEM_PROMPTS.recommendations, false);
+      setCached(cacheKey, result, 'recommendations');
+      return { statusCode: 200, headers, body: JSON.stringify({ result }) };
+    }
+
+    if (mode === 'seo') {
+      const topic    = (customTopic || message || 'product review website').trim();
+      const cacheKey = `seo:${topic}`;
+      const cached   = getCached(cacheKey);
+      if (cached) return { statusCode: 200, headers, body: JSON.stringify({ result: cached }) };
+      const prompt = `Give me specific, actionable SEO advice for a product review site in this niche: "${topic}".
+Cover: title optimization, schema markup, featured snippets, internal linking, keyword targeting, and quick wins.
+Focus on tactics that work in 2025 for review-focused content.`;
+      result = await callGemini(prompt, SYSTEM_PROMPTS.seo, false);
+      setCached(cacheKey, result, 'seo');
+      return { statusCode: 200, headers, body: JSON.stringify({ result }) };
+    }
+
+    return { statusCode: 400, headers, body: JSON.stringify({ error: `Unknown mode: ${mode}` }) };
 
   } catch (err) {
-    console.error('review-adviser error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Internal server error' }) };
+    console.error('review-adviser error:', err.message);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: err.message,
+        hint: !GEMINI_API_KEY
+          ? 'GEMINI_API_KEY is missing — add it in Netlify → Site config → Environment variables.'
+          : 'Check Netlify function logs for the full error.',
+      }),
+    };
   }
 };
