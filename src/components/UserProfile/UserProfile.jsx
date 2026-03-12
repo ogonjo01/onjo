@@ -630,11 +630,13 @@ const AIAdviser = ({ theme: T }) => {
       if (isBullet) {
         const raw      = line.replace(/^[-•*]\s+/, '');
         const display  = stripBold(raw);
-        const clickText = display.split(':')[0].split('–')[0].split('(')[0].trim();
         if (allowClickable && display.length > 10) {
+          const ctaPrompt = subTab === 'news' || subTab === 'trending'
+            ? `Based on this trending item from the latest ${subTab} feed:\n\n"${display}"\n\nWrite a complete, SEO-optimised review outline with a specific keyword-rich title that targets current search demand, plus a full affiliate CTA placement guide. Make the title formula match the exact product name, year, and key selling point from the context above.`
+            : `Give me a complete review outline and affiliate CTA placement guide for: "${display}"`;
           return (
             <div key={i}
-              onClick={() => askInChat(`Give me a complete review outline and affiliate CTA placement guide for: "${clickText}"`)}
+              onClick={() => askInChat(ctaPrompt)}
               style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, padding: '9px 12px', background: T.surface, borderRadius: 9, border: `1px solid ${T.border}`, cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = T.accent; e.currentTarget.style.background = T.accent + '12'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.surface; }}
@@ -660,11 +662,13 @@ const AIAdviser = ({ theme: T }) => {
         const num       = numMatch[1];
         const raw       = line.replace(/^\d+[.)\s]+/, '');
         const display   = stripBold(raw);
-        const clickText = display.split(':')[0].split('–')[0].split('(')[0].trim();
         if (allowClickable && display.length > 10) {
+          const ctaPrompt = subTab === 'news' || subTab === 'trending'
+            ? `Based on this trending item from the latest ${subTab} feed:\n\n"${display}"\n\nWrite a complete, SEO-optimised review outline with a specific keyword-rich title that targets current search demand, plus a full affiliate CTA placement guide. Make the title formula match the exact product name, year, and key selling point from the context above.`
+            : `Give me a complete review outline and affiliate CTA placement guide for: "${display}"`;
           return (
             <div key={i}
-              onClick={() => askInChat(`Give me a complete review outline and affiliate CTA placement guide for: "${clickText}"`)}
+              onClick={() => askInChat(ctaPrompt)}
               style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 8, padding: '9px 12px', background: T.surface, borderRadius: 9, border: `1px solid ${T.border}`, cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = T.accent; e.currentTarget.style.background = T.accent + '12'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.surface; }}
