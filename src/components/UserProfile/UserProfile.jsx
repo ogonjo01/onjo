@@ -433,27 +433,31 @@ const AIAdviser = ({ theme:T }) => {
   useEffect(()=>{ setError(null); },[subTab]);
 
   // ── Core fetch — calls ONJO Reviews' own function ─────────────────────────
-  const callAdviser = async (mode, message='', topic='') => {
+  // For chat mode, passes full conversation history so Gemini has memory
+  const callAdviser = async (mode, message='', topic='', history=[]) => {
     const res = await fetch('/.netlify/functions/review-adviser', {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ mode, message, customTopic: topic }),
+      body: JSON.stringify({ mode, message, customTopic: topic, history }),
     });
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return data.result || data.content || 'No response.';
   };
 
-  // ── Chat ──────────────────────────────────────────────────────────────────
+  // ── Chat — passes full history for memory ────────────────────────────────
   const sendChat = async (override='') => {
     const text = (override || chatInput).trim();
     if(!text || chatLoading) return;
     setChatInput('');
+    // Capture history BEFORE adding new user message (Gemini will receive it)
+    const historySnapshot = [...messages];
     const userMsg = { role:'user', content:text };
     setMessages(prev=>[...prev, userMsg]);
     setChatLoading(true);
     try {
-      const reply = await callAdviser('chat', text);
+      // Pass full conversation history so Gemini remembers what it said
+      const reply = await callAdviser('chat', text, '', historySnapshot);
       setMessages(prev=>[...prev, { role:'assistant', content:reply }]);
     } catch(err) {
       setMessages(prev=>[...prev, { role:'assistant', content:`⚠️ Error: ${err.message}` }]);

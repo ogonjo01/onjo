@@ -132,7 +132,43 @@ exports.handler = async (event) => {
     if (mode === 'chat') {
       const userMsg = (message || '').trim();
       if (!userMsg) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Empty message' }) };
-      const result = await callGemini(userMsg, SYSTEM_PROMPTS.chat, false);
+
+      // Build conversation history so Gemini has memory of past messages
+      const history = Array.isArray(body.history) ? body.history : [];
+      const contents = [];
+
+      // Add up to last 12 messages for context
+      const recentHistory = history.slice(-12);
+      for (const m of recentHistory) {
+        if (m.role === 'user' || m.role === 'assistant') {
+          contents.push({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content || m.text || '' }],
+          });
+        }
+      }
+
+      // Add current message if not already in history
+      const lastContent = contents[contents.length - 1];
+      if (!lastContent || lastContent.parts[0].text !== userMsg) {
+        contents.push({ role: 'user', parts: [{ text: userMsg }] });
+      }
+
+      if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set.');
+      const geminiBody = {
+        system_instruction: { parts: [{ text: SYSTEM_PROMPTS.chat }] },
+        contents,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4000 },
+      };
+      const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody),
+      });
+      if (!res.ok) { const e = await res.text(); throw new Error(`Gemini error ${res.status}: ${e}`); }
+      const data = await res.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const result = parts.find(p => p.text && !p.thought)?.text || parts[0]?.text || 'No response generated.';
       return { statusCode: 200, headers, body: JSON.stringify({ result }) };
     }
 
