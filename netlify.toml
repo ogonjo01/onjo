@@ -6,17 +6,20 @@
 [dev]
   functions = "netlify/functions"
   command = "npm run dev"
-  port = 8081         # Netlify proxy
-  targetPort = 8082   # Actual Vite server (based on your logs)
+  port = 8081
+  targetPort = 8082
 
+[[redirects]]
+  from = "/api/review-adviser"
+  to = "/.netlify/functions/review-adviser"
+  status = 200
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-
-  [[redirects]]
+[[redirects]]
   from = "/summary/*"
   to = "/review/:splat"
   status = 301
