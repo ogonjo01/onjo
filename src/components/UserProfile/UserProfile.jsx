@@ -549,6 +549,14 @@ const AIAdviser = ({ theme: T }) => {
   const [chatInput, setChatInput]     = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatBottomRef                 = useRef(null);
+  const [copiedId, setCopiedId]       = useState(null); // 'msg-{i}' | 'tab'
+
+  const copyText = (text, id) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, chatLoading]);
   useEffect(() => { setError(null); }, [subTab]);
@@ -723,18 +731,31 @@ const AIAdviser = ({ theme: T }) => {
                 {msg.role === 'assistant' && (
                   <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: `linear-gradient(135deg,${T.accent},#8b5cf6)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#fff', fontWeight: 800 }}>A</div>
                 )}
-                <div style={{
-                  maxWidth: '80%', padding: '10px 14px',
-                  borderRadius: msg.role === 'user' ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
-                  background: msg.role === 'user' ? T.accent : T.surface,
-                  color: msg.role === 'user' ? '#fff' : T.text,
-                  border: `1px solid ${msg.role === 'user' ? 'transparent' : T.border}`,
-                  fontSize: 12, lineHeight: 1.65,
-                }}>
-                  {msg.role === 'user'
-                    ? <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.content}</span>
-                    : <div style={{ wordBreak: 'break-word' }}>{renderMarkdown(msg.content, false)}</div>
-                  }
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 4 }}>
+                  <div style={{
+                    maxWidth: '100%', padding: '10px 14px',
+                    borderRadius: msg.role === 'user' ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
+                    background: msg.role === 'user' ? T.accent : T.surface,
+                    color: msg.role === 'user' ? '#fff' : T.text,
+                    border: `1px solid ${msg.role === 'user' ? 'transparent' : T.border}`,
+                    fontSize: 12, lineHeight: 1.65,
+                  }}>
+                    {msg.role === 'user'
+                      ? <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.content}</span>
+                      : <div style={{ wordBreak: 'break-word' }}>{renderMarkdown(msg.content, false)}</div>
+                    }
+                  </div>
+                  {msg.role === 'assistant' && (
+                    <button
+                      onClick={() => copyText(msg.content, `msg-${i}`)}
+                      title="Copy to clipboard"
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: `1px solid ${T.border}`, borderRadius: 6, padding: '3px 9px', cursor: 'pointer', fontSize: 10, color: copiedId === `msg-${i}` ? '#10b981' : T.textMuted, transition: 'all 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = T.accent; e.currentTarget.style.color = T.accent; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = copiedId === `msg-${i}` ? '#10b981' : T.textMuted; }}
+                    >
+                      {copiedId === `msg-${i}` ? '✓ Copied' : '⎘ Copy'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -834,6 +855,18 @@ const AIAdviser = ({ theme: T }) => {
                   <span style={{ fontSize: 11, color: T.accent, fontWeight: 600 }}>Click any product or title to get a full review outline + affiliate CTA placement strategy</span>
                 </div>
                 {renderMarkdown(currentResult, true)}
+                {/* Copy button at bottom of tab results */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+                  <button
+                    onClick={() => copyText(currentResult, 'tab')}
+                    title="Copy all to clipboard"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: copiedId === 'tab' ? '#10b98122' : T.surface, border: `1px solid ${copiedId === 'tab' ? '#10b981' : T.border}`, borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: copiedId === 'tab' ? '#10b981' : T.textSub, transition: 'all 0.15s' }}
+                    onMouseEnter={e => { if (copiedId !== 'tab') { e.currentTarget.style.borderColor = T.accent; e.currentTarget.style.color = T.accent; } }}
+                    onMouseLeave={e => { if (copiedId !== 'tab') { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textSub; } }}
+                  >
+                    {copiedId === 'tab' ? '✓ Copied!' : '⎘ Copy all'}
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '40px 16px', color: T.textMuted }}>
