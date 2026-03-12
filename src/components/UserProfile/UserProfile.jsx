@@ -397,7 +397,7 @@ const AIAdviser = ({ theme:T }) => {
   // ── THE KEY LINE: this calls /api/review-adviser — ONJO Reviews' own function
   const callAdviser = useCallback(async (mode, userMessage='', customTopic='') => {
     try {
-      const res = await fetch('/api/review-adviser', {
+      const res = await fetch('/.netlify/functions/review-adviser', {
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ mode, message:userMessage, customTopic }),
