@@ -1,3 +1,4 @@
+# ── ONJO Reviews netlify.toml ──────────────────────────────────────────────
 [build]
   command = "npm run build"
   functions = "netlify/functions"
@@ -9,6 +10,7 @@
   port = 8081
   targetPort = 8082
 
+# review-adviser MUST come before /* or the catch-all swallows it
 [[redirects]]
   from = "/api/review-adviser"
   to = "/.netlify/functions/review-adviser"
@@ -23,4 +25,4 @@
   from = "/summary/*"
   to = "/review/:splat"
   status = 301
-  force = true 
+  force = true
