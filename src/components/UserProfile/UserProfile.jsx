@@ -364,172 +364,378 @@ const AnalyticsDashboard = ({ theme:T }) => {
   );
 };
 
-/* ─── AI ADVISER — calls /api/review-adviser (ONJO Reviews only) ─────────── */
-const AI_TABS = [
-  { id:'chat',            label:'💬 Ask',      desc:'Ask anything about writing better reviews' },
-  { id:'trending',        label:'🔥 Trending', desc:'What products/topics are hot right now' },
-  { id:'recommendations', label:'💡 Ideas',    desc:'Review ideas based on content gaps' },
-  { id:'seo',             label:'🔍 SEO Tips', desc:'SEO advice tailored to product reviews' },
-  { id:'news',            label:'📰 News',     desc:'Latest product and consumer news to cover' },
+// ─────────────────────────────────────────────────────────────────────────────
+// AI ADVISER — ONJO Reviews
+// Modeled on OGONJO's Marcus pattern but product-review & affiliate focused.
+// Calls /.netlify/functions/review-adviser
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ADVISER_TABS = [
+  { id:'chat',    label:'💬 Ask',      desc:'Ask anything about reviews & affiliate strategy' },
+  { id:'trending',label:'🔥 Trending', desc:'Hot products with high traffic & affiliate potential' },
+  { id:'ideas',   label:'💡 Ideas',    desc:'Review ideas ranked by affiliate conversion probability' },
+  { id:'news',    label:'📰 News',     desc:'New product launches & trends to review first' },
+  { id:'seo',     label:'🔍 SEO',      desc:'Title & CTA strategy to rank and convert' },
 ];
 
-const SUGGESTED_PROMPTS = {
-  chat:            ['How do I write a compelling review intro?','What makes a verdict section trustworthy?','How long should a product review be?','How do I compare two competing products fairly?','What\'s the best way to structure pros and cons?','How do I add affiliate links without sounding salesy?'],
-  trending:        ['What tech products are trending this week?','What home appliances are people searching for?','What AI tools should I review next?','What\'s trending in fitness equipment?'],
-  recommendations: ['What review categories am I missing?','Suggest 5 products I should review based on what\'s popular','What are content gaps in the Electronics category?','What products are underreviewed but high-demand?'],
-  seo:             ['How should I title a product review for Google?','What schema markup should a review page have?','How do I rank for "best X" keywords?','How do I optimize my review for featured snippets?'],
-  news:            ['What new products launched this week worth reviewing?','What consumer tech news should I cover?','What product recalls or controversies are trending?','What\'s happening in the smartphone market right now?'],
+const ADVISER_PROMPTS = {
+  chat: [
+    "What products have the highest affiliate conversion rates right now?",
+    "How do I structure a review to maximize affiliate clicks?",
+    "Where exactly should I place CTAs in a product review?",
+    "What makes readers trust a product verdict and buy?",
+    "How do I write a comparison post that converts well?",
+    "What's the best affiliate disclosure strategy that doesn't kill conversions?",
+  ],
+  trending: [
+    "What tech gadgets are trending with high buy intent this week?",
+    "What home products are people actively searching to buy?",
+    "Which AI tools have the best affiliate programs right now?",
+    "What fitness products are trending with strong commissions?",
+  ],
+  ideas: [
+    "What review topics have low competition but high buyer intent?",
+    "What comparison posts would drive the most affiliate revenue?",
+    "What products are underreviewed but have strong demand?",
+    "What 'best X under $Y' posts should I write this week?",
+  ],
+  news: [
+    "What products just launched that I should review first?",
+    "What product controversies could drive traffic to my reviews?",
+    "What new affiliate programs launched recently worth joining?",
+    "What tech releases this week have high review search volume?",
+  ],
+  seo: [
+    "How do I title a review to rank for 'best X' searches?",
+    "What schema markup maximizes my review's Google visibility?",
+    "How do I optimize for featured snippets in product reviews?",
+    "Where should buy buttons and affiliate CTAs go for max clicks?",
+  ],
 };
 
 const AIAdviser = ({ theme:T }) => {
-  const [activeAiTab, setActiveAiTab]   = useState('chat');
-  const [chatInput, setChatInput]       = useState('');
-  const [chatHistory, setChatHistory]   = useState([]);
-  const [tabContent, setTabContent]     = useState({ trending:null, recommendations:null, seo:null, news:null });
-  const [tabLoading, setTabLoading]     = useState({});
-  const [customTopics, setCustomTopics] = useState({ trending:'', recommendations:'', seo:'', news:'' });
-  const [chatLoading, setChatLoading]   = useState(false);
-  const [suggestIdx, setSuggestIdx]     = useState(0);
-  const chatEndRef = useRef(null);
+  const [subTab, setSubTab]         = useState('chat');
+  const [loading, setLoading]       = useState(false);
+  const [result, setResult]         = useState({ trending:null, ideas:null, news:null, seo:null });
+  const [error, setError]           = useState(null);
+  const [customTopic, setCustomTopic] = useState('');
 
-  useEffect(()=>{ chatEndRef.current?.scrollIntoView({ behavior:'smooth' }); },[chatHistory, chatLoading]);
+  // Chat
+  const [messages, setMessages] = useState([{
+    role:'assistant',
+    content:"Hey — I'm your ONJO Reviews AI Adviser.\n\nI help you figure out which products to review, how to write reviews that convert affiliate clicks, and what's trending in the market right now.\n\nAsk me anything: what to review next, how to structure your verdict section, where to place CTAs, which products are trending with high buy intent — I'm here to help you grow your affiliate revenue.\n\nWhat do you want to work on?"
+  }]);
+  const [chatInput, setChatInput]     = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatBottomRef = useRef(null);
 
-  // ── THE KEY LINE: this calls /api/review-adviser — ONJO Reviews' own function
-  const callAdviser = useCallback(async (mode, userMessage='', customTopic='') => {
-    try {
-      const res = await fetch('/.netlify/functions/review-adviser', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ mode, message:userMessage, customTopic }),
-      });
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return data.result || data.content || data.text || 'No response.';
-    } catch(err) {
-      console.error('AI Adviser error', err);
-      return `⚠️ Could not reach the AI adviser.\n\nError: ${err.message}`;
-    }
-  }, []);
+  useEffect(()=>{ chatBottomRef.current?.scrollIntoView({ behavior:'smooth' }); },[messages, chatLoading]);
+  useEffect(()=>{ setError(null); },[subTab]);
 
-  const sendChat = useCallback(async (text) => {
-    const msg=(text||chatInput).trim();
-    if(!msg||chatLoading) return;
+  // ── Core fetch — calls ONJO Reviews' own function ─────────────────────────
+  const callAdviser = async (mode, message='', topic='') => {
+    const res = await fetch('/.netlify/functions/review-adviser', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ mode, message, customTopic: topic }),
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.result || data.content || 'No response.';
+  };
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  const sendChat = async (override='') => {
+    const text = (override || chatInput).trim();
+    if(!text || chatLoading) return;
     setChatInput('');
-    setChatHistory(prev=>[...prev,{ role:'user', text:msg }]);
+    const userMsg = { role:'user', content:text };
+    setMessages(prev=>[...prev, userMsg]);
     setChatLoading(true);
-    const reply = await callAdviser('chat', msg);
-    setChatHistory(prev=>[...prev,{ role:'assistant', text:reply }]);
-    setChatLoading(false);
-  },[chatInput, chatLoading, callAdviser]);
+    try {
+      const reply = await callAdviser('chat', text);
+      setMessages(prev=>[...prev, { role:'assistant', content:reply }]);
+    } catch(err) {
+      setMessages(prev=>[...prev, { role:'assistant', content:`⚠️ Error: ${err.message}` }]);
+    } finally { setChatLoading(false); }
+  };
 
-  const loadTab = useCallback(async (tabId, customTopic='') => {
-    if(tabId==='chat') return;
-    setTabLoading(prev=>({...prev,[tabId]:true}));
-    const result = await callAdviser(tabId, '', customTopic);
-    setTabContent(prev=>({...prev,[tabId]:result}));
-    setTabLoading(prev=>({...prev,[tabId]:false}));
-  },[callAdviser]);
+  // ── Tab data fetch ────────────────────────────────────────────────────────
+  const fetchTab = async (tab, topic='') => {
+    setLoading(true); setError(null);
+    const modeMap = { trending:'trending', ideas:'recommendations', news:'news', seo:'seo' };
+    const mode = modeMap[tab] || tab;
+    try {
+      const text = await callAdviser(mode, '', topic || customTopic);
+      setResult(prev=>({ ...prev, [tab]: text }));
+    } catch(err) {
+      setError(err.message);
+    } finally { setLoading(false); }
+  };
 
-  useEffect(()=>{
-    if(activeAiTab!=='chat'&&tabContent[activeAiTab]===null) loadTab(activeAiTab);
-  },[activeAiTab, tabContent, loadTab]);
+  // ── Ask in chat from another tab ─────────────────────────────────────────
+  const askInChat = (question) => {
+    setSubTab('chat');
+    setTimeout(()=>sendChat(question), 80);
+  };
 
-  const visiblePrompts = SUGGESTED_PROMPTS[activeAiTab].slice(suggestIdx, suggestIdx+3);
-
-  const renderMarkdown = (text) => {
+  // ── Markdown renderer (same as existing) ─────────────────────────────────
+  const renderMarkdown = (text, allowClickable=false) => {
     if(!text) return null;
-    return text.split('\n').map((line,i)=>{
-      if(line.startsWith('## ')) return <h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.text, margin:'12px 0 4px' }}>{line.slice(3)}</h3>;
-      if(line.startsWith('# '))  return <h2 key={i} style={{ fontSize:14, fontWeight:800, color:T.text, margin:'14px 0 6px' }}>{line.slice(2)}</h2>;
-      if(line.startsWith('- ')||line.startsWith('• ')) return <div key={i} style={{ display:'flex', gap:7, marginBottom:4 }}><span style={{ color:T.accent, flexShrink:0 }}>•</span><span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{line.slice(2)}</span></div>;
-      if(/^\d+\./.test(line)) return <div key={i} style={{ display:'flex', gap:7, marginBottom:4 }}><span style={{ color:'#8b5cf6', fontWeight:700, flexShrink:0, fontSize:11 }}>{line.match(/^\d+/)[0]}.</span><span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{line.replace(/^\d+\.\s*/,'')}</span></div>;
-      if(line.startsWith('**')&&line.endsWith('**')) return <p key={i} style={{ fontSize:12, fontWeight:700, color:T.text, margin:'6px 0 2px' }}>{line.slice(2,-2)}</p>;
+    const lines = text.split('\n');
+    return lines.map((line, i) => {
+      if(line.startsWith('## ')) return <h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.text, margin:'14px 0 6px', borderBottom:`1px solid ${T.border}`, paddingBottom:4 }}>{line.slice(3)}</h3>;
+      if(line.startsWith('# '))  return <h2 key={i} style={{ fontSize:15, fontWeight:800, color:T.text, margin:'16px 0 8px' }}>{line.slice(2)}</h2>;
+      if(line.startsWith('### ')) return <h4 key={i} style={{ fontSize:12, fontWeight:700, color:T.accent, margin:'10px 0 4px' }}>{line.slice(4)}</h4>;
+
+      // Clickable bullet for titles/product names (lines starting with "- **" or "- 🔥" etc.)
+      if((line.startsWith('- **') || line.startsWith('• **')) && allowClickable) {
+        const inner = line.replace(/^[-•]\s*\*\*/, '').replace(/\*\*.*/, '').trim();
+        const rest  = line.replace(/^[-•]\s*\*\*[^*]+\*\*/, '').trim();
+        return(
+          <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8, padding:'8px 10px', background:T.surface, borderRadius:8, border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.background=T.accent+'10'; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.surface; }}
+            onClick={()=>askInChat(`Give me a full review outline for: "${inner}" — including verdict structure, where to place affiliate CTAs, pros/cons framework, and SEO title options.`)}>
+            <span style={{ color:T.accent, flexShrink:0, marginTop:1 }}>•</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:T.text }}>{inner}</span>
+              {rest && <span style={{ fontSize:11, color:T.textSub, marginLeft:6 }}>{rest}</span>}
+              <div style={{ fontSize:10, color:T.accent, marginTop:3, fontWeight:600 }}>→ Click to get review outline + CTA strategy</div>
+            </div>
+          </div>
+        );
+      }
+
+      if(line.startsWith('- ') || line.startsWith('• ')) {
+        const content = line.slice(2);
+        // Check if it looks like a product/title line we should make clickable
+        const isProductLine = /^[A-Z]/.test(content) && content.length > 15 && allowClickable;
+        return(
+          <div key={i} style={{ display:'flex', gap:7, marginBottom:isProductLine?6:3,
+            ...(isProductLine?{ padding:'6px 10px', background:T.surface, borderRadius:7, border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }:{})
+          }}
+            onMouseEnter={isProductLine?e=>{ e.currentTarget.style.borderColor=T.accent; }:undefined}
+            onMouseLeave={isProductLine?e=>{ e.currentTarget.style.borderColor=T.border; }:undefined}
+            onClick={isProductLine?()=>askInChat(`Give me a full review outline + affiliate CTA strategy for: "${content.split(':')[0].trim()}"`)  :undefined}
+          >
+            <span style={{ color:T.accent, flexShrink:0 }}>•</span>
+            <div>
+              <span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{content}</span>
+              {isProductLine && <div style={{ fontSize:10, color:T.accent, marginTop:2, fontWeight:600 }}>→ Get outline</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if(/^\d+\./.test(line)) {
+        const num = line.match(/^\d+/)[0];
+        const content = line.replace(/^\d+\.\s*/,'');
+        const isClickable = allowClickable && /^[A-Z"]/.test(content) && content.length > 20;
+        return(
+          <div key={i} style={{ display:'flex', gap:8, marginBottom:isClickable?8:4,
+            ...(isClickable?{ padding:'8px 10px', background:T.surface, borderRadius:8, border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }:{})
+          }}
+            onMouseEnter={isClickable?e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.background=T.accent+'10'; }:undefined}
+            onMouseLeave={isClickable?e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.surface; }:undefined}
+            onClick={isClickable?()=>askInChat(`Give me a full review outline + affiliate CTA placement for: "${content.split(':')[0].trim()}"`)  :undefined}
+          >
+            <span style={{ color:T.accent, fontWeight:700, flexShrink:0, fontSize:11, minWidth:16 }}>{num}.</span>
+            <div>
+              <span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{content}</span>
+              {isClickable && <div style={{ fontSize:10, color:T.accent, marginTop:2, fontWeight:600 }}>→ Get full outline + CTA placement</div>}
+            </div>
+          </div>
+        );
+      }
+
+      if(line.startsWith('**') && line.endsWith('**')) return <p key={i} style={{ fontSize:12, fontWeight:700, color:T.text, margin:'8px 0 3px' }}>{line.slice(2,-2)}</p>;
       if(!line.trim()) return <div key={i} style={{ height:6 }}/>;
       return <p key={i} style={{ fontSize:12, color:T.textSub, margin:'2px 0', lineHeight:1.6 }}>{line}</p>;
     });
   };
 
+  const isChat = subTab === 'chat';
+  const currentResult = result[subTab];
+
+  // ── Tab input placeholder ─────────────────────────────────────────────────
+  const placeholderMap = {
+    trending: 'e.g. "smart home gadgets" or "fitness tech"…',
+    ideas:    'e.g. "kitchen appliances" or "budget laptops"…',
+    news:     'e.g. "smartphone releases" or "AI tools"…',
+    seo:      'e.g. "robot vacuums" or "protein supplements"…',
+  };
+
   return(
-    <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden', gap:10 }}>
-      <div style={{ display:'flex', gap:4, background:T.surface, borderRadius:10, padding:4, flexShrink:0, border:`1px solid ${T.border}` }}>
-        {AI_TABS.map(t=>(
-          <button key={t.id} onClick={()=>setActiveAiTab(t.id)} style={{ flex:1, padding:'7px 6px', borderRadius:7, border:'none', cursor:'pointer', background:activeAiTab===t.id?T.tabActive:'transparent', color:activeAiTab===t.id?T.tabText:T.tabInactive, fontSize:11, fontWeight:600, transition:'all 0.15s' }} title={t.desc}>{t.label}</button>
+    <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden', gap:0 }}>
+
+      {/* Tab bar */}
+      <div style={{ display:'flex', gap:3, background:T.surface, borderRadius:10, padding:4, flexShrink:0, border:`1px solid ${T.border}`, marginBottom:10 }}>
+        {ADVISER_TABS.map(t=>(
+          <button key={t.id} onClick={()=>setSubTab(t.id)} title={t.desc} style={{
+            flex:1, padding:'7px 4px', borderRadius:7, border:'none', cursor:'pointer',
+            background:subTab===t.id?T.tabActive:'transparent',
+            color:subTab===t.id?T.tabText:T.tabInactive,
+            fontSize:11, fontWeight:600, transition:'all 0.15s',
+          }}>{t.label}</button>
         ))}
       </div>
 
-      {activeAiTab==='chat'&&(
+      {/* Suggested prompts strip */}
+      <div style={{ display:'flex', gap:5, marginBottom:8, flexWrap:'wrap', flexShrink:0 }}>
+        {ADVISER_PROMPTS[subTab].slice(0,3).map((p,i)=>(
+          <button key={i}
+            onClick={()=> isChat ? sendChat(p) : askInChat(p)}
+            style={{ background:T.surface, border:`1px solid ${T.border}`, color:T.textSub, padding:'4px 10px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:500, transition:'all 0.12s', maxWidth:260, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.color=T.accent; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.color=T.textSub; }}
+            title={p}>{p}</button>
+        ))}
+      </div>
+
+      {/* ── CHAT TAB ───────────────────────────────────────────────────────── */}
+      {isChat && (
         <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
-          <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-            {visiblePrompts.map((p,i)=>(
-              <button key={i} onClick={()=>sendChat(p)} style={{ background:T.surface, border:`1px solid ${T.border}`, color:T.textSub, padding:'5px 10px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:500, maxWidth:220, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }} title={p}>{p}</button>
-            ))}
-            <button onClick={()=>setSuggestIdx(prev=>(prev+3)%SUGGESTED_PROMPTS[activeAiTab].length)} style={{ background:'none', border:`1px solid ${T.border}`, color:T.textMuted, padding:'5px 8px', borderRadius:20, fontSize:11, cursor:'pointer' }}>↻</button>
-          </div>
           <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:10, paddingRight:4, marginBottom:8 }}>
-            {chatHistory.length===0&&(
-              <div style={{ textAlign:'center', padding:'32px 16px', color:T.textMuted }}>
-                <div style={{ fontSize:36, marginBottom:10 }}>🤖</div>
-                <div style={{ fontSize:13, fontWeight:600, marginBottom:6, color:T.textSub }}>Your AI Review Adviser</div>
-                <div style={{ fontSize:12, lineHeight:1.6 }}>Ask anything about writing better product reviews,<br/>improving SEO, crafting compelling verdicts, or<br/>deciding what to review next.</div>
-              </div>
-            )}
-            {chatHistory.map((msg,i)=>(
-              <div key={i} style={{ display:'flex', justifyContent:msg.role==='user'?'flex-end':'flex-start' }}>
-                {msg.role==='assistant'&&<div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, marginRight:8, marginTop:2, background:'linear-gradient(135deg,#8b5cf6,#06b6d4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:'#fff', fontWeight:700 }}>A</div>}
-                <div style={{ maxWidth:'78%', padding:'9px 13px', borderRadius:msg.role==='user'?'12px 12px 3px 12px':'12px 12px 12px 3px', background:msg.role==='user'?T.accent:T.surface, color:msg.role==='user'?'#fff':T.text, border:`1px solid ${msg.role==='user'?'transparent':T.border}`, fontSize:12, lineHeight:1.6 }}>
-                  {msg.role==='user'?<span>{msg.text}</span>:<div>{renderMarkdown(msg.text)}</div>}
-                </div>
+            {messages.map((msg,i)=>(
+              <div key={i} style={{ display:'flex', justifyContent:msg.role==='user'?'flex-end':'flex-start', gap:8, alignItems:'flex-end' }}>
+                {msg.role==='assistant'&&(
+                  <div style={{ width:28, height:28, borderRadius:'50%', flexShrink:0, background:`linear-gradient(135deg,${T.accent},#8b5cf6)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:'#fff', fontWeight:800 }}>A</div>
+                )}
+                <div style={{ maxWidth:'80%', padding:'10px 14px',
+                  borderRadius:msg.role==='user'?'14px 14px 3px 14px':'14px 14px 14px 3px',
+                  background:msg.role==='user'?T.accent:T.surface,
+                  color:msg.role==='user'?'#fff':T.text,
+                  border:`1px solid ${msg.role==='user'?'transparent':T.border}`,
+                  fontSize:12, lineHeight:1.65, whiteSpace:'pre-wrap', wordBreak:'break-word',
+                }}>{msg.content}</div>
               </div>
             ))}
             {chatLoading&&(
-              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <div style={{ width:26, height:26, borderRadius:'50%', background:'linear-gradient(135deg,#8b5cf6,#06b6d4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:'#fff', fontWeight:700 }}>A</div>
-                <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:'12px 12px 12px 3px', padding:'10px 14px', display:'flex', gap:4, alignItems:'center' }}>
+              <div style={{ display:'flex', gap:8, alignItems:'flex-end' }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', background:`linear-gradient(135deg,${T.accent},#8b5cf6)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:'#fff', fontWeight:800 }}>A</div>
+                <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:'14px 14px 14px 3px', padding:'10px 14px', display:'flex', gap:4, alignItems:'center' }}>
                   {[0,1,2].map(d=><div key={d} style={{ width:6, height:6, borderRadius:'50%', background:T.accent, animation:'ai-pulse 1.2s ease-in-out infinite', animationDelay:`${d*0.2}s` }}/>)}
                 </div>
               </div>
             )}
-            <div ref={chatEndRef}/>
+            {messages.length===1&&!chatLoading&&(
+              <div style={{ padding:'0 0 8px' }}>
+                <div style={{ fontSize:11, color:T.textMuted, marginBottom:8, textTransform:'uppercase', letterSpacing:1, fontWeight:600 }}>💡 Quick actions</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  {[
+                    ['🔥 What should I review this week?','What products should I review this week for maximum affiliate revenue potential?'],
+                    ['💰 Best affiliate niches now','What product niches have the highest affiliate commission rates and conversion potential right now?'],
+                    ['✍️ CTA placement guide','Where exactly should I place affiliate CTAs in a product review to maximize click-through rate?'],
+                    ['📊 Review structure that converts','What\'s the optimal structure for a product review that both ranks on Google and converts affiliate sales?'],
+                  ].map(([label,q],i)=>(
+                    <button key={i} onClick={()=>sendChat(q)} style={{
+                      background:T.surface, border:`1px solid ${T.border}`, borderRadius:8,
+                      padding:'9px 11px', fontSize:11, color:T.textSub, cursor:'pointer',
+                      textAlign:'left', lineHeight:1.4, transition:'all 0.15s',
+                    }}
+                      onMouseEnter={e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.color=T.text; e.currentTarget.style.background=T.accent+'10'; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.color=T.textSub; e.currentTarget.style.background=T.surface; }}
+                    >{label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div ref={chatBottomRef}/>
           </div>
+
           <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-            <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&sendChat()} placeholder="Ask about review writing, SEO, product ideas…" disabled={chatLoading} style={{ flex:1, padding:'9px 14px', background:T.inputBg, border:`1px solid ${T.inputBorder}`, borderRadius:10, color:T.text, fontSize:12, outline:'none', opacity:chatLoading?0.6:1 }}/>
-            <button onClick={()=>sendChat()} disabled={!chatInput.trim()||chatLoading} style={{ background:chatInput.trim()&&!chatLoading?T.accentGrad:T.surface, border:'none', borderRadius:10, padding:'9px 16px', cursor:chatInput.trim()&&!chatLoading?'pointer':'not-allowed', color:chatInput.trim()&&!chatLoading?'#fff':T.textMuted, fontSize:16, fontWeight:700, transition:'all 0.15s' }}>↑</button>
+            <input value={chatInput} onChange={e=>setChatInput(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&sendChat()}
+              placeholder="Ask about review strategy, affiliate CTAs, what to review next…"
+              disabled={chatLoading}
+              style={{ flex:1, padding:'10px 14px', background:T.inputBg, border:`1px solid ${T.inputBorder}`, borderRadius:10, color:T.text, fontSize:12, outline:'none', opacity:chatLoading?0.6:1 }}/>
+            <button onClick={()=>sendChat()} disabled={!chatInput.trim()||chatLoading} style={{
+              background:chatInput.trim()&&!chatLoading?T.accentGrad:T.surface, border:'none',
+              borderRadius:10, padding:'10px 16px',
+              cursor:chatInput.trim()&&!chatLoading?'pointer':'not-allowed',
+              color:chatInput.trim()&&!chatLoading?'#fff':T.textMuted,
+              fontSize:16, fontWeight:700, transition:'all 0.15s',
+            }}>↑</button>
           </div>
         </div>
       )}
 
-      {activeAiTab!=='chat'&&(
+      {/* ── NON-CHAT TABS ─────────────────────────────────────────────────── */}
+      {!isChat && (
         <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
+          {/* Topic input + fetch button */}
           <div style={{ display:'flex', gap:8, marginBottom:10, flexShrink:0 }}>
-            <input value={customTopics[activeAiTab]||''} onChange={e=>setCustomTopics(prev=>({...prev,[activeAiTab]:e.target.value}))}
-              placeholder={activeAiTab==='trending'?'Focus on a niche, e.g. "smart home"…':activeAiTab==='recommendations'?'Your site focus, e.g. "budget tech"…':activeAiTab==='news'?'Product category, e.g. "smartphones"…':'Your category, e.g. "fitness gear"…'}
+            <input value={customTopic} onChange={e=>setCustomTopic(e.target.value)}
+              placeholder={placeholderMap[subTab]||'Type a product category or niche…'}
               style={{ flex:1, padding:'8px 12px', background:T.inputBg, border:`1px solid ${T.inputBorder}`, borderRadius:9, color:T.text, fontSize:12, outline:'none' }}
-              onKeyDown={e=>e.key==='Enter'&&loadTab(activeAiTab, customTopics[activeAiTab])}/>
-            <button onClick={()=>loadTab(activeAiTab, customTopics[activeAiTab])} disabled={tabLoading[activeAiTab]} style={{ background:T.accentGrad, color:'#fff', border:'none', borderRadius:9, padding:'8px 16px', cursor:'pointer', fontSize:12, fontWeight:600, opacity:tabLoading[activeAiTab]?0.6:1 }}>{tabLoading[activeAiTab]?'…':'↻ Refresh'}</button>
+              onKeyDown={e=>e.key==='Enter'&&fetchTab(subTab)}/>
+            <button onClick={()=>fetchTab(subTab)} disabled={loading} style={{
+              background:loading?T.surface:T.accentGrad, color:loading?T.textMuted:'#fff',
+              border:'none', borderRadius:9, padding:'8px 16px', cursor:loading?'default':'pointer',
+              fontSize:12, fontWeight:600, opacity:loading?0.7:1, flexShrink:0,
+            }}>{loading?'Searching…':'↻ Search'}</button>
           </div>
-          <div style={{ display:'flex', gap:5, marginBottom:10, flexWrap:'wrap', flexShrink:0 }}>
-            {SUGGESTED_PROMPTS[activeAiTab].slice(0,3).map((p,i)=>(
-              <button key={i} onClick={()=>{ setCustomTopics(prev=>({...prev,[activeAiTab]:p})); loadTab(activeAiTab,p); }} style={{ background:T.surface, border:`1px solid ${T.border}`, color:T.textSub, padding:'4px 10px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:500 }}>{p.length>36?p.slice(0,36)+'…':p}</button>
-            ))}
-          </div>
+
+          {error&&(
+            <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:8, padding:'8px 12px', color:'#f87171', fontSize:12, marginBottom:8, flexShrink:0 }}>⚠️ {error}</div>
+          )}
+
+          {/* Results */}
           <div style={{ flex:1, overflowY:'auto', background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:'16px 18px' }}>
-            {tabLoading[activeAiTab]?(
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:160, gap:12, color:T.textMuted }}>
-                <div style={{ display:'flex', gap:5 }}>{[0,1,2].map(d=><div key={d} style={{ width:8, height:8, borderRadius:'50%', background:T.accent, animation:'ai-pulse 1.2s ease-in-out infinite', animationDelay:`${d*0.2}s` }}/>)}</div>
-                <span style={{ fontSize:12 }}>AI is thinking…</span>
+            {loading ? (
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:200, gap:12 }}>
+                <div style={{ display:'flex', gap:5 }}>
+                  {[0,1,2].map(d=><div key={d} style={{ width:8, height:8, borderRadius:'50%', background:T.accent, animation:'ai-pulse 1.2s ease-in-out infinite', animationDelay:`${d*0.2}s` }}/>)}
+                </div>
+                <span style={{ fontSize:12, color:T.textMuted }}>Searching the web for {subTab === 'trending' ? 'trending products' : subTab === 'ideas' ? 'review opportunities' : subTab === 'news' ? 'latest product news' : 'SEO insights'}…</span>
               </div>
-            ):tabContent[activeAiTab]?(
-              <div>{renderMarkdown(tabContent[activeAiTab])}</div>
-            ):(
-              <div style={{ textAlign:'center', padding:'40px 16px', color:T.textMuted, fontSize:12 }}>Hit Refresh to load {AI_TABS.find(t=>t.id===activeAiTab)?.label} insights</div>
+            ) : currentResult ? (
+              <div>
+                {/* Instruction banner */}
+                <div style={{ background:T.accent+'12', border:`1px solid ${T.accent}33`, borderRadius:8, padding:'8px 12px', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:14 }}>👆</span>
+                  <span style={{ fontSize:11, color:T.accent, fontWeight:600 }}>Click any product or title to get a full review outline + affiliate CTA placement strategy</span>
+                </div>
+                {renderMarkdown(currentResult, true)}
+              </div>
+            ) : (
+              <div style={{ textAlign:'center', padding:'40px 16px', color:T.textMuted }}>
+                <div style={{ fontSize:32, marginBottom:10 }}>
+                  {subTab==='trending'?'🔥':subTab==='ideas'?'💡':subTab==='news'?'📰':'🔍'}
+                </div>
+                <div style={{ fontSize:13, fontWeight:600, color:T.textSub, marginBottom:6 }}>
+                  {subTab==='trending' && 'Find trending products with high affiliate potential'}
+                  {subTab==='ideas'    && 'Discover review opportunities ranked by conversion probability'}
+                  {subTab==='news'     && 'Get the latest product launches to review first'}
+                  {subTab==='seo'      && 'SEO & CTA strategy to rank and convert'}
+                </div>
+                <div style={{ fontSize:11, color:T.textMuted, marginBottom:16 }}>
+                  {subTab==='trending' && 'See what products people are searching to buy right now'}
+                  {subTab==='ideas'    && 'AI-ranked ideas based on search demand and affiliate commission potential'}
+                  {subTab==='news'     && 'Be first to review new products — early reviews capture all the traffic'}
+                  {subTab==='seo'      && 'Get title formulas, CTA placement guides, and schema markup tips'}
+                </div>
+                <button onClick={()=>fetchTab(subTab)} style={{
+                  background:T.accentGrad, color:'#fff', border:'none', borderRadius:9,
+                  padding:'10px 24px', cursor:'pointer', fontSize:12, fontWeight:700,
+                }}>
+                  {subTab==='trending' && '🔥 Find Trending Products'}
+                  {subTab==='ideas'    && '💡 Generate Review Ideas'}
+                  {subTab==='news'     && '📰 Get Latest Product News'}
+                  {subTab==='seo'      && '🔍 Get SEO & CTA Strategy'}
+                </button>
+              </div>
             )}
           </div>
         </div>
       )}
+
       <style>{`@keyframes ai-pulse { 0%,80%,100%{transform:scale(0.7);opacity:0.4} 40%{transform:scale(1);opacity:1} }`}</style>
     </div>
   );
 };
+
 
 /* ─── TEAM MANAGER ────────────────────────────────────────────────────────── */
 const TeamManager = ({ theme:T }) => {

@@ -25,14 +25,15 @@ Format your response with clear sections:
 ## ⚡ Quick Win Opportunities
 Be specific with product names, categories, and why they're trending. Keep it actionable. Today is March 2026.`,
 
-  recommendations: `You are a content strategy advisor for ONJO Reviews, a product review platform.
-Suggest specific review content ideas that fill gaps and drive traffic.
+  recommendations: `You are an affiliate revenue strategist for ONJO Reviews, a product review platform.
+Suggest product review ideas ranked by affiliate conversion potential and buyer intent.
 Format your response with clear sections:
-## 💡 High-Opportunity Review Topics
-## 🔍 Underserved Niches
-## 📊 Comparison Posts to Write
-## 🎯 Buyer Intent Keywords to Target
-Be specific, actionable, and focused on what will drive search traffic and affiliate conversions.`,
+## 💰 Highest Affiliate Potential Reviews (list specific products with estimated commission rates)
+## 🔥 Comparison Posts That Convert (specific head-to-head reviews with strong buyer intent)
+## 🎯 Buyer Intent Keywords to Target (actual search queries people use before buying)
+## ⚡ Quick Win Opportunities (low competition, high buyer intent, easy to rank)
+For each item: give a clickable title idea, why it converts, and where to place the main CTA.
+Be specific — name actual products, brands, and approximate commission tiers.`,
 
   seo: `You are an SEO expert specializing in product review websites.
 Give specific, actionable SEO advice for ONJO Reviews content creators.
