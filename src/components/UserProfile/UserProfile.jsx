@@ -607,7 +607,7 @@ const AIAdviser = ({ theme: T }) => {
 
   const callAdviser = useCallback(async (mode, userMessage = '', customTopic = '') => {
     try {
-      const res = await fetch('/.netlify/functions/review-adviser', {
+      const res = await fetch('/api/review-adviser', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode, message: userMessage, customTopic }),
