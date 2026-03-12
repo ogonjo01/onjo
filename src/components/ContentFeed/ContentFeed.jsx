@@ -1,13 +1,17 @@
 // src/components/ContentFeed/ContentFeed.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../supabase/supabaseClient';
 import BookSummaryCard from '../BookSummaryCard/BookSummaryCard';
 import HorizontalCarousel from '../HorizontalCarousel/HorizontalCarousel';
+import DraftPanel from '../DraftPanel/DraftPanel';
 import './ContentFeed.css';
 
 const ITEMS_PER_CAROUSEL = 12;
 const CATEGORY_BATCH = 3;
 const MIN_LOAD_MS = 350;
+const DRAFTS_TAB = '📝 Drafts';
+const FOR_YOU_TAB = 'For You';
 
 const LIGHT_SELECT = `
   id,
@@ -75,17 +79,13 @@ const normalizeRow = (r = {}) => {
   const likes = parseNumber(r.likes_count);
   const views = parseNumber(r.views_count);
   const comments = parseNumber(r.comments_count);
-
   const avg_rating = parseNumber(r.avg_rating ?? r.avg ?? r.rating ?? r.average_rating);
   const rating_count = parseNumber(r.rating_count ?? r.ratings_count ?? r.rating_count_aggregate ?? r.count ?? r.rating_count_value);
-
   const safeTitle = _safeString(r.title) || 'Untitled';
   const safeAuthor = _safeString(r.author) || _safeString(r.creator_name) || _safeString(r.creator) || '';
   const safeImage = _safeString(r.image_url) || _safeString(r.cover) || _safeString(r.cover_url) || null;
-
   const rawTags = r.tags || [];
   const tags = Array.isArray(rawTags) ? rawTags.map(t => (typeof t === 'string' ? t.trim().toLowerCase() : String(t).toLowerCase())) : [];
-
   return {
     id: r.id,
     slug: r.slug ?? null,
@@ -109,24 +109,18 @@ const normalizeRow = (r = {}) => {
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const fetchRpcOrFallback = async (rpcName, { limit = ITEMS_PER_CAROUSEL, category = null } = {}) => {
-  // SKIP RPC - force fallback which includes comments_count
   try {
     let q = supabase.from('book_summaries').select(SELECT_WITH_COUNTS);
     if (category) q = q.eq('category', category);
     q = q.limit(500);
     const { data, error } = await q;
     if (error) throw error;
-
-    console.debug('[fetchRpcOrFallback] fallback data', { rpcName, category, rows: (data || []).length });
-
     const rows = (data || []).map(normalizeRow);
-
     let sorted = rows.slice();
     if (rpcName.includes('new')) sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     else if (rpcName.includes('liked')) sorted.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0));
     else if (rpcName.includes('rated')) sorted.sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
     else if (rpcName.includes('view')) sorted.sort((a, b) => (b.views_count || 0) - (a.views_count || 0));
-
     return sorted.slice(0, limit);
   } catch (err) {
     console.error('[fallback] fetch error', err);
@@ -155,12 +149,21 @@ const fetchTopCategories = async (limit = 50) => {
   }
 };
 
-const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQuery = '' }) => {
+const ContentFeed = ({
+  selectedCategory = FOR_YOU_TAB,
+  onEdit,
+  onDelete,
+  searchQuery = '',
+  userRole = 'user',   // 'user' | 'team' | 'admin' — passed from parent
+}) => {
+  const location = useLocation();
+
   // Site origin used for constructing canonical review links in JSON-LD
-  const SITE_ORIGIN = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : 'https://your-onjo-app.netlify.app';
+  const SITE_ORIGIN = (typeof window !== 'undefined' && window.location && window.location.origin)
+    ? window.location.origin.replace(/\/$/, '')
+    : 'https://your-onjo-app.netlify.app';
 
   const [loadingGlobal, setLoadingGlobal] = useState(true);
-
   const [globalContent, setGlobalContent] = useState({
     newest: [],
     mostLiked: [],
@@ -175,7 +178,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
   const [availableTags, setAvailableTags] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
-
   const [taggedResults, setTaggedResults] = useState(null);
   const [taggedLoading, setTaggedLoading] = useState(false);
 
@@ -184,20 +186,30 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
   const rootRef = useRef(null);
   const sentinelRef = useRef(null);
   const mountedRef = useRef(true);
-
   const fastCacheRef = useRef(new Map());
+
+  /* ── derived flags ── */
+  const isDraftTab   = selectedCategory === DRAFTS_TAB;
+  const isForYou     = !isDraftTab && (selectedCategory === FOR_YOU_TAB || selectedCategory === 'All');
+  const canSeeDrafts = userRole === 'admin' || userRole === 'team';
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
+  // SPA scroll-to-top on route change
   useEffect(() => {
-    const scrollToFeedTop = () => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } catch (_) {}
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const go = () => {
       try {
         const el = rootRef.current;
         if (el) {
-          const rectTop = el.getBoundingClientRect().top + window.pageYOffset;
           const header = document.querySelector('header');
           const headerH = header ? (header.offsetHeight || 0) : 0;
-          const top = Math.max(0, rectTop - headerH - 8);
+          const top = Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - headerH - 8);
           window.scrollTo({ top, behavior: 'auto' });
         } else {
           window.scrollTo({ top: 0, behavior: 'auto' });
@@ -206,38 +218,27 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (e) {}
       }
     };
-
-    scrollToFeedTop();
-    const t = setTimeout(scrollToFeedTop, 120);
+    go();
+    const t = setTimeout(go, 120);
     return () => clearTimeout(t);
   }, [selectedCategory, searchQuery]);
 
   useEffect(() => {
+    if (isDraftTab) return;
     (async () => {
       try {
         let q = supabase
           .from('book_summaries')
           .select('tags')
           .limit(5000);
-
-        const specific = selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All';
-        if (specific) {
-          q = q.eq('category', selectedCategory);
-        }
-
+        if (!isForYou) q = q.eq('category', selectedCategory);
         const { data, error } = await q;
         if (error) throw error;
-
         const set = new Set();
         (data || []).forEach(row => {
           const arr = row?.tags || [];
-          if (Array.isArray(arr)) {
-            arr.forEach(t => {
-              if (t && typeof t === 'string') set.add(t.trim().toLowerCase());
-            });
-          }
+          if (Array.isArray(arr)) arr.forEach(t => { if (t && typeof t === 'string') set.add(t.trim().toLowerCase()); });
         });
-
         const list = Array.from(set).sort();
         if (mountedRef.current) {
           setAvailableTags(list);
@@ -251,25 +252,21 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         console.warn('Could not load tags for chips bar', err);
       }
     })();
-  }, [selectedCategory, tagsReloadKey]);
+  }, [selectedCategory, tagsReloadKey, isDraftTab, isForYou]);
 
   const fastFetchList = useCallback(async (limit = ITEMS_PER_CAROUSEL, category = null) => {
     const cacheKey = category ? `cat:${category}` : `global`;
     const cache = fastCacheRef.current.get(cacheKey);
     if (cache) return cache;
-
     try {
       let q = supabase
         .from('book_summaries')
         .select(LIGHT_SELECT)
         .order('created_at', { ascending: false })
         .limit(limit);
-
       if (category) q = q.eq('category', category);
-
       const { data, error } = await q;
       if (error) throw error;
-
       const normalized = (data || []).map((r) => normalizeRow(r));
       fastCacheRef.current.set(cacheKey, normalized);
       return normalized;
@@ -306,9 +303,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
   const replaceCategoryBlock = useCallback((newBlock) => {
     setLoadedCategoryBlocks((prev) => {
       const idx = prev.findIndex((b) => String(b.category) === String(newBlock.category));
-      if (idx === -1) {
-        return [...prev, newBlock];
-      }
+      if (idx === -1) return [...prev, newBlock];
       const copy = prev.slice();
       copy[idx] = newBlock;
       return copy;
@@ -324,15 +319,13 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       if (sortKey === 'views') return items.slice().sort((a, b) => (b.views_count || 0) - (a.views_count || 0));
       return items.slice();
     }
-
     const tagSet = new Set(selectedTags.map(t => t.toLowerCase()));
     const scored = items.map(it => {
       const itemTags = Array.isArray(it.tags) ? it.tags.map(t => (t || '').toLowerCase()) : [];
       const matchCount = itemTags.reduce((acc, t) => acc + (tagSet.has(t) ? 1 : 0), 0);
       return { it, matchCount };
     });
-
-    const sorted = scored.sort((a, b) => {
+    return scored.sort((a, b) => {
       if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
       if (sortKey === 'newest') return new Date(b.it.created_at) - new Date(a.it.created_at);
       if (sortKey === 'likes') return (b.it.likes_count || 0) - (a.it.likes_count || 0);
@@ -340,44 +333,30 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       if (sortKey === 'views') return (b.it.views_count || 0) - (a.it.views_count || 0);
       return 0;
     }).map(s => s.it);
-
-    return sorted;
   }, []);
 
   const loadNextCategoryBatch = useCallback(async () => {
     if (loadingCategories) return;
-    if (!categoryQueue || categoryQueue.length === 0) {
-      setHasMoreCategories(false);
-      return;
-    }
+    if (!categoryQueue || categoryQueue.length === 0) { setHasMoreCategories(false); return; }
     setLoadingCategories(true);
     const batch = categoryQueue.slice(0, CATEGORY_BATCH);
     const rest = categoryQueue.slice(batch.length);
     setCategoryQueue(rest);
-
     try {
       const placeholderPromises = batch.map((c) => fastFetchList(4, c).then((items) => ({
-        category: c,
-        newest: items,
-        mostLiked: items,
-        highestRated: items,
-        mostViewed: items,
+        category: c, newest: items, mostLiked: items, highestRated: items, mostViewed: items,
       })));
       const placeholders = await Promise.all(placeholderPromises);
       if (!mountedRef.current) return;
       setLoadedCategoryBlocks((prev) => [...prev, ...placeholders]);
-
       (async () => {
         try {
           const blocks = await Promise.all(batch.map((c) => fetchContentBlock(c)));
           if (!mountedRef.current) return;
-          const nonEmpty = blocks.filter(b => (b.newest.length || b.mostLiked.length || b.highestRated.length || b.mostViewed.length));
-          nonEmpty.forEach((blk) => replaceCategoryBlock(blk));
-        } catch (err) {
-          console.error('background load batch error', err);
-        }
+          blocks.filter(b => (b.newest.length || b.mostLiked.length || b.highestRated.length || b.mostViewed.length))
+            .forEach((blk) => replaceCategoryBlock(blk));
+        } catch (err) { console.error('background load batch error', err); }
       })();
-
       setHasMoreCategories(rest.length > 0);
     } catch (err) {
       console.error('loadNextCategoryBatch err', err);
@@ -387,6 +366,9 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
   }, [categoryQueue, loadingCategories, fetchContentBlock, fastFetchList, replaceCategoryBlock]);
 
   useEffect(() => {
+    // Draft tab: DraftPanel handles its own data fetching
+    if (isDraftTab) { setLoadingGlobal(false); return; }
+
     (async () => {
       setLoadingGlobal(true);
       setLoadedCategoryBlocks([]);
@@ -416,8 +398,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         return;
       }
 
-      const specific = selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All';
-      if (specific) {
+      if (!isForYou) {
         const start = Date.now();
         try {
           const placeholder = await fastFetchList(ITEMS_PER_CAROUSEL, selectedCategory);
@@ -430,9 +411,7 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
               if (!mountedRef.current) return;
               setLoadedCategoryBlocks((block.newest.length || block.mostLiked.length || block.highestRated.length || block.mostViewed.length) ? [block] : []);
               setTagsReloadKey(k => k + 1);
-            } catch (err) {
-              console.error('specific category background fetch error', err);
-            }
+            } catch (err) { console.error('specific category background fetch error', err); }
           })();
         } catch (err) {
           console.error('specific category fetch error', err);
@@ -449,7 +428,6 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         const fast = await fastFetchList(ITEMS_PER_CAROUSEL);
         if (!mountedRef.current) return;
         setGlobalContent({ newest: fast, mostLiked: fast, highestRated: fast, mostViewed: fast });
-
         (async () => {
           try {
             const [globalBlock, cats] = await Promise.all([fetchContentBlock(), fetchTopCategories(200)]);
@@ -458,37 +436,27 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
             setTagsReloadKey(k => k + 1);
             setCategoryQueue(cats);
             setHasMoreCategories(cats.length > 0);
-
             const initialBatch = cats.slice(0, CATEGORY_BATCH);
             const rest = cats.slice(initialBatch.length);
             if (initialBatch.length) {
               const placeholderPromises = initialBatch.map((c) => fastFetchList(4, c).then((items) => ({
-                category: c,
-                newest: items,
-                mostLiked: items,
-                highestRated: items,
-                mostViewed: items,
+                category: c, newest: items, mostLiked: items, highestRated: items, mostViewed: items,
               })));
               const placeholders = await Promise.all(placeholderPromises);
               if (!mountedRef.current) return;
               setLoadedCategoryBlocks(placeholders);
               setCategoryQueue(rest);
               setHasMoreCategories(rest.length > 0);
-
               (async () => {
                 try {
                   const blocks = await Promise.all(initialBatch.map((c) => fetchContentBlock(c)));
                   if (!mountedRef.current) return;
-                  const nonEmpty = blocks.filter(b => (b.newest.length || b.mostLiked.length || b.highestRated.length || b.mostViewed.length));
-                  nonEmpty.forEach((blk) => replaceCategoryBlock(blk));
-                } catch (err) {
-                  console.error('background initial category fetch failed', err);
-                }
+                  blocks.filter(b => (b.newest.length || b.mostLiked.length || b.highestRated.length || b.mostViewed.length))
+                    .forEach((blk) => replaceCategoryBlock(blk));
+                } catch (err) { console.error('background initial category fetch failed', err); }
               })();
             }
-          } catch (err) {
-            console.error('background load failed', err);
-          }
+          } catch (err) { console.error('background load failed', err); }
         })();
       } catch (err) {
         console.error('Initial global fast load failed:', err);
@@ -498,16 +466,14 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
         if (mountedRef.current) setLoadingGlobal(false);
       }
     })();
-  }, [selectedCategory, searchQuery, fastFetchList, fetchContentBlock, replaceCategoryBlock]);
+  }, [selectedCategory, searchQuery, isDraftTab, isForYou, fastFetchList, fetchContentBlock, replaceCategoryBlock]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;
     const node = sentinelRef.current;
     const obs = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting && hasMoreCategories && !loadingCategories) {
-          loadNextCategoryBatch();
-        }
+        if (entry.isIntersecting && hasMoreCategories && !loadingCategories) loadNextCategoryBatch();
       });
     }, { root: null, rootMargin: '600px', threshold: 0.1 });
     obs.observe(node);
@@ -533,24 +499,18 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     }
   }, []);
 
-  const buildViewAllLink = (sortKey = 'newest', category = null, tag = null, fields = 'id,title,description,author,created_at,tags') => {
+  const buildViewAllLink = (sortKey = 'newest', category = null, tag = null) => {
     const params = new URLSearchParams();
     if (sortKey) params.set('sort', sortKey);
     if (category) params.set('category', category);
-    if (tag) {
-      params.set('tag', tag);
-      params.set('tag_only', '1');
-    }
-    if (fields) params.set('fields', fields);
+    if (tag) { params.set('tag', tag); params.set('tag_only', '1'); }
     return `/explore?${params.toString()}`;
   };
 
   const buildSeeMoreText = ({ sortKey = 'newest', category = null, tag = null } = {}) => {
     const sortMap = {
-      newest: 'Newest Reviews',
-      likes: 'Most Liked Reviews',
-      rating: 'Highest Rated Reviews',
-      views: 'Most Viewed Reviews',
+      newest: 'Newest Reviews', likes: 'Most Liked Reviews',
+      rating: 'Highest Rated Reviews', views: 'Most Viewed Reviews',
     };
     const base = sortMap[sortKey] || 'more reviews';
     if (tag) return `Explore more ${base} related to "${tag}"`;
@@ -572,35 +532,27 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!selectedTags || selectedTags.length === 0) {
-        setTaggedResults(null);
-        setTaggedLoading(false);
-        return;
-      }
-
+      if (!selectedTags || selectedTags.length === 0) { setTaggedResults(null); setTaggedLoading(false); return; }
       const tag = selectedTags[0];
       setTaggedLoading(true);
       try {
-        const rows = await fetchTaggedContent(tag, (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, ITEMS_PER_CAROUSEL);
+        const rows = await fetchTaggedContent(tag, !isForYou ? selectedCategory : null, ITEMS_PER_CAROUSEL);
         if (!mountedRef.current || !mounted) return;
         setTaggedResults(rows || []);
       } catch (err) {
-        console.error('tag fetch failed', err);
         if (mountedRef.current && mounted) setTaggedResults([]);
       } finally {
         if (mountedRef.current && mounted) setTaggedLoading(false);
       }
     })();
     return () => { mounted = false; };
-  }, [selectedTags, selectedCategory, fetchTaggedContent]);
+  }, [selectedTags, selectedCategory, fetchTaggedContent, isForYou]);
 
   const toggleTag = (tag) => {
     const lower = tag.toLowerCase();
     setSelectedTags(prev => {
       const cur = Array.isArray(prev) ? prev : [];
-      if (cur.length > 0 && cur[0] === lower) {
-        return [];
-      }
+      if (cur.length > 0 && cur[0] === lower) return [];
       return [lower];
     });
   };
@@ -614,91 +566,52 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
     ));
   };
 
-  const isForYou = selectedCategory === 'For You' || selectedCategory === 'All';
-
-  // ----- SEO: generate and inject JSON-LD for search engines
+  /* ── SEO JSON-LD ── */
   const generateJsonLd = useCallback(() => {
     try {
       const lists = [];
-      // helper to transform items into schema list elements
       const makeItemListElement = (items = [], name = 'Reviews') => {
         const max = Math.min(items.length, 10);
         const itemListElement = [];
-        for (let i = 0; i < max; i += 1) {
+        for (let i = 0; i < max; i++) {
           const it = items[i];
           if (!it) continue;
           const slugOrId = it.slug ? it.slug : String(it.id);
-          const url = `${SITE_ORIGIN}/review/${encodeURIComponent(slugOrId)}`;
           itemListElement.push({
-            "@type": "ListItem",
-            position: i + 1,
-            url,
+            "@type": "ListItem", position: i + 1,
+            url: `${SITE_ORIGIN}/review/${encodeURIComponent(slugOrId)}`,
             name: it.title || `Review ${slugOrId}`,
             image: it.image_url || undefined,
             description: it.description || undefined,
           });
         }
-        if (itemListElement.length === 0) return null;
-        return {
-          "@type": "ItemList",
-          name,
-          itemListElement,
-        };
+        if (!itemListElement.length) return null;
+        return { "@type": "ItemList", name, itemListElement };
       };
-
-      // global lists
-      if (globalContent?.newest?.length) {
-        const el = makeItemListElement(globalContent.newest, 'Newest Reviews');
-        if (el) lists.push(el);
-      }
-      if (globalContent?.mostLiked?.length) {
-        const el = makeItemListElement(globalContent.mostLiked, 'Most Liked Reviews');
-        if (el) lists.push(el);
-      }
-      if (globalContent?.highestRated?.length) {
-        const el = makeItemListElement(globalContent.highestRated, 'Highest Rated Reviews');
-        if (el) lists.push(el);
-      }
-      if (globalContent?.mostViewed?.length) {
-        const el = makeItemListElement(globalContent.mostViewed, 'Most Viewed Reviews');
-        if (el) lists.push(el);
-      }
-
-      // categories
+      if (globalContent?.newest?.length) { const el = makeItemListElement(globalContent.newest, 'Newest Reviews'); if (el) lists.push(el); }
+      if (globalContent?.mostLiked?.length) { const el = makeItemListElement(globalContent.mostLiked, 'Most Liked Reviews'); if (el) lists.push(el); }
+      if (globalContent?.highestRated?.length) { const el = makeItemListElement(globalContent.highestRated, 'Highest Rated Reviews'); if (el) lists.push(el); }
+      if (globalContent?.mostViewed?.length) { const el = makeItemListElement(globalContent.mostViewed, 'Most Viewed Reviews'); if (el) lists.push(el); }
       (loadedCategoryBlocks || []).forEach((blk) => {
         if (!blk) return;
-        const nameBase = blk.category ? String(blk.category) : 'Category';
-        const elN = makeItemListElement(blk.newest, `Newest in ${nameBase}`);
-        if (elN) lists.push(elN);
+        const el = makeItemListElement(blk.newest, `Newest in ${blk.category || 'Category'}`);
+        if (el) lists.push(el);
       });
-
-      if (lists.length === 0) return null;
-
-      // top-level web page schema
-      const json = {
-        "@context": "https://schema.org",
-        "@type": "WebPage",
+      if (!lists.length) return null;
+      return JSON.stringify({
+        "@context": "https://schema.org", "@type": "WebPage",
         "url": SITE_ORIGIN + (typeof window !== 'undefined' ? window.location.pathname : '/'),
         "name": "ONJO Reviews — Product Reviews & Recommendations",
         "description": "ONJO Reviews is a product review and recommendation platform that evaluates tools through real-world use, clear pros and cons, and side-by-side comparisons.",
         "mainEntity": lists,
-      };
-
-      return JSON.stringify(json);
-    } catch (err) {
-      console.warn('generateJsonLd error', err);
-      return null;
-    }
+      });
+    } catch (err) { console.warn('generateJsonLd error', err); return null; }
   }, [SITE_ORIGIN, globalContent, loadedCategoryBlocks]);
 
   useEffect(() => {
     const jsonld = generateJsonLd();
     const id = 'onjo-jsonld-contentfeed';
-    if (!jsonld) {
-      const existing = document.getElementById(id);
-      if (existing) existing.remove();
-      return;
-    }
+    if (!jsonld) { const existing = document.getElementById(id); if (existing) existing.remove(); return; }
     let script = document.getElementById(id);
     if (!script) {
       script = document.createElement('script');
@@ -707,35 +620,39 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       document.head.appendChild(script);
     }
     script.text = jsonld;
-    return () => {
-      /* keep script in DOM for crawlers — update logic will replace text when needed */
-    };
   }, [generateJsonLd]);
 
+  /* ─────────────────────────────────────────────────────
+     DRAFT TAB — render DraftPanel, skip everything else
+  ───────────────────────────────────────────────────── */
+  if (isDraftTab && canSeeDrafts) {
+    return (
+      <div className="content-feed-root" ref={rootRef}>
+        <DraftPanel onEdit={onEdit} />
+      </div>
+    );
+  }
+
+  if (isDraftTab && !canSeeDrafts) {
+    return (
+      <div className="content-feed-root" ref={rootRef}>
+        <p style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+          You don't have permission to view drafts.
+        </p>
+      </div>
+    );
+  }
+
+  /* ─────────────────────────────────────────────────────
+     NORMAL FEED
+  ───────────────────────────────────────────────────── */
   return (
     <div className="content-feed-root" ref={rootRef}>
-      {/* Hidden H1 to help crawlers index this page for search queries */}
-      <h1
-        style={{
-          position: 'absolute',
-          width: '1px',
-          height: '1px',
-          padding: 0,
-          margin: '-1px',
-          overflow: 'hidden',
-          clip: 'rect(0,0,0,0)',
-          border: 0,
-        }}
-      >
+      <h1 style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
         ONJO Reviews — Product evaluation and recommendation platform
       </h1>
 
-      <section
-        className="intro-banner"
-        role="region"
-        aria-label="ONJO Reviews mission"
-        aria-live="polite"
-      >
+      <section className="intro-banner" role="region" aria-label="ONJO Reviews mission" aria-live="polite">
         <div className="intro-banner-inner">
           <div className="intro-banner-icon" aria-hidden="true">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false" role="img" aria-hidden="true">
@@ -743,16 +660,10 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
               <path d="M12 2c-.9 1.3-3.6 3.1-8 3v2c4.2 0 7 2 8 3 1-1 3.8-3 8-3V5c-4.4 0-7.1-1.7-8-3z" fill="white" opacity="0.08" />
             </svg>
           </div>
-
           <div className="intro-banner-text">
-            <div className="intro-banner-title">
-              ONJO Reviews
-            </div>
-            <div className="intro-banner-subtitle">
-              We review, compare, and break down products to help people make better buying decisions.
-            </div>
+            <div className="intro-banner-title">ONJO Reviews</div>
+            <div className="intro-banner-subtitle">We review, compare, and break down products to help people make better buying decisions.</div>
           </div>
-
           <div className="intro-banner-cta">
             <a className="btn-mini" href="/about" title="Learn more about ONJO Reviews mission" aria-label="Learn more about ONJO Reviews mission">Learn more</a>
           </div>
@@ -762,74 +673,47 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
       <div className="categories-bar" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
           {availableTags.length === 0 ? (
-            (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? (
-              <div className="hf-loading" role="status" aria-live="polite">No tags for this category.</div>
-            ) : (
-              <div className="hf-loading" role="status" aria-live="polite">Loading tags…</div>
-            )
+            <div className="hf-loading" role="status" aria-live="polite">
+              {!isForYou ? 'No tags for this category.' : 'Loading tags…'}
+            </div>
           ) : (
             availableTags.map((tag) => {
               const active = selectedTags.includes(tag.toLowerCase());
               return (
-                <button
-                  key={tag}
-                  className={`category-chip ${active ? 'active' : ''}`}
-                  onClick={() => toggleTag(tag)}
-                  aria-pressed={active}
-                  type="button"
-                  title={`Filter reviews by ${tag}`}
-                >
-                  {tag}
-                </button>
+                <button key={tag} className={`category-chip ${active ? 'active' : ''}`}
+                  onClick={() => toggleTag(tag)} aria-pressed={active} type="button"
+                  title={`Filter reviews by ${tag}`}>{tag}</button>
               );
             })
           )}
         </div>
-
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {selectedTags.length > 0 && (
-            <button className="hf-btn" type="button" onClick={clearTags} aria-label={`Clear selected tags (${selectedTags.length})`}>Clear tags ({selectedTags.length})</button>
+            <button className="hf-btn" type="button" onClick={clearTags} aria-label={`Clear selected tags (${selectedTags.length})`}>
+              Clear tags ({selectedTags.length})
+            </button>
           )}
         </div>
       </div>
 
       {selectedTags.length > 0 && (
         <section className="feed-section" aria-labelledby="tag-results-heading">
-          <HorizontalCarousel
-            title={`Tag: ${selectedTags[0]} — Reviews`}
-            items={taggedResults || []}
-            loading={taggedLoading}
-            skeletonCount={6}
-            aria-label={`Carousel of reviews tagged ${selectedTags[0]}`}
-          >
+          <HorizontalCarousel title={`Tag: ${selectedTags[0]} — Reviews`} items={taggedResults || []} loading={taggedLoading} skeletonCount={6}>
             {renderCards(taggedResults || [], 'newest')}
           </HorizontalCarousel>
-
           <SeeMoreCTA
-            href={buildViewAllLink('newest', (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, selectedTags[0])}
-            text={buildSeeMoreText({ sortKey: 'newest', category: (selectedCategory && selectedCategory !== 'For You' && selectedCategory !== 'All') ? selectedCategory : null, tag: selectedTags[0] })}
-            ariaLabel={`Explore more reviews tagged ${selectedTags[0]}`}
+            href={buildViewAllLink('newest', !isForYou ? selectedCategory : null, selectedTags[0])}
+            text={buildSeeMoreText({ sortKey: 'newest', category: !isForYou ? selectedCategory : null, tag: selectedTags[0] })}
           />
         </section>
       )}
 
       {searchQuery && searchQuery.trim() && (
         <section className="feed-section" aria-labelledby="search-results-heading">
-          <HorizontalCarousel
-            title={`Search results for "${searchQuery}" — Reviews`}
-            items={globalContent.newest}
-            loading={loadingGlobal}
-            skeletonCount={6}
-            aria-label={`Search results carousel for ${searchQuery}`}
-          >
+          <HorizontalCarousel title={`Search results for "${searchQuery}" — Reviews`} items={globalContent.newest} loading={loadingGlobal} skeletonCount={6}>
             {renderCards(globalContent.newest, 'newest')}
           </HorizontalCarousel>
-
-          <SeeMoreCTA
-            href={`/explore?q=${encodeURIComponent(searchQuery)}`}
-            text={`Explore more results for "${searchQuery}"`}
-            ariaLabel={`Explore more results for ${searchQuery}`}
-          />
+          <SeeMoreCTA href={`/explore?q=${encodeURIComponent(searchQuery)}`} text={`Explore more results for "${searchQuery}"`} />
         </section>
       )}
 
@@ -845,21 +729,13 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
             const items = loadedCategoryBlocks[0][k];
             const sortKey = k === 'newest' ? 'newest' : (k === 'mostLiked' ? 'likes' : (k === 'highestRated' ? 'rating' : 'views'));
             return (
-              <section className="feed-section" key={k} aria-labelledby={`cat-${k}-heading`}>
-                <HorizontalCarousel
-                  title={titleMap[k]}
-                  items={items}
-                  loading={loadingGlobal}
-                  skeletonCount={6}
-                  aria-label={titleMap[k]}
-                >
+              <section className="feed-section" key={k}>
+                <HorizontalCarousel title={titleMap[k]} items={items} loading={loadingGlobal} skeletonCount={6}>
                   {renderCards(items, sortKey)}
                 </HorizontalCarousel>
-
                 <SeeMoreCTA
                   href={buildViewAllLink(sortKey, loadedCategoryBlocks[0].category)}
                   text={buildSeeMoreText({ sortKey, category: loadedCategoryBlocks[0].category })}
-                  ariaLabel={`Explore more ${sortKey} reviews in ${loadedCategoryBlocks[0].category}`}
                 />
               </section>
             );
@@ -869,155 +745,41 @@ const ContentFeed = ({ selectedCategory = 'For You', onEdit, onDelete, searchQue
 
       {isForYou && !searchQuery && (
         <>
-          <section className="feed-section" aria-labelledby="global-newest-heading">
-            <HorizontalCarousel
-              title="Newest Reviews"
-              items={globalContent.newest}
-              loading={loadingGlobal}
-              skeletonCount={6}
-              aria-label="Newest product reviews carousel"
-            >
-              {renderCards(globalContent.newest, 'newest')}
-            </HorizontalCarousel>
-
-            <SeeMoreCTA
-              href={buildViewAllLink('newest', null)}
-              text={buildSeeMoreText({ sortKey: 'newest' })}
-              ariaLabel="Explore more newest reviews"
-            />
-          </section>
-
-          <section className="feed-section" aria-labelledby="global-mostliked-heading">
-            <HorizontalCarousel
-              title="Most Liked Reviews"
-              items={globalContent.mostLiked}
-              loading={loadingGlobal}
-              skeletonCount={6}
-              aria-label="Most liked product reviews carousel"
-            >
-              {renderCards(globalContent.mostLiked, 'likes')}
-            </HorizontalCarousel>
-
-            <SeeMoreCTA
-              href={buildViewAllLink('likes', null)}
-              text={buildSeeMoreText({ sortKey: 'likes' })}
-              ariaLabel="Explore more most-liked reviews"
-            />
-          </section>
-
-          <section className="feed-section" aria-labelledby="global-highestrated-heading">
-            <HorizontalCarousel
-              title="Highest Rated Reviews"
-              items={globalContent.highestRated}
-              loading={loadingGlobal}
-              skeletonCount={6}
-              aria-label="Highest rated product reviews carousel"
-            >
-              {renderCards(globalContent.highestRated, 'rating')}
-            </HorizontalCarousel>
-
-            <SeeMoreCTA
-              href={buildViewAllLink('rating', null)}
-              text={buildSeeMoreText({ sortKey: 'rating' })}
-              ariaLabel="Explore more highest-rated reviews"
-            />
-          </section>
-
-          <section className="feed-section" aria-labelledby="global-mostviewed-heading">
-            <HorizontalCarousel
-              title="Most Viewed Reviews"
-              items={globalContent.mostViewed}
-              loading={loadingGlobal}
-              skeletonCount={6}
-              aria-label="Most viewed product reviews carousel"
-            >
-              {renderCards(globalContent.mostViewed, 'views')}
-            </HorizontalCarousel>
-
-            <SeeMoreCTA
-              href={buildViewAllLink('views', null)}
-              text={buildSeeMoreText({ sortKey: 'views' })}
-              ariaLabel="Explore more most-viewed reviews"
-            />
-          </section>
+          {[
+            { key: 'newest',       title: 'Newest Reviews',        sortKey: 'newest' },
+            { key: 'mostLiked',    title: 'Most Liked Reviews',     sortKey: 'likes'  },
+            { key: 'highestRated', title: 'Highest Rated Reviews',  sortKey: 'rating' },
+            { key: 'mostViewed',   title: 'Most Viewed Reviews',    sortKey: 'views'  },
+          ].map(({ key, title, sortKey }) => (
+            <section className="feed-section" key={key}>
+              <HorizontalCarousel title={title} items={globalContent[key]} loading={loadingGlobal} skeletonCount={6}>
+                {renderCards(globalContent[key], sortKey)}
+              </HorizontalCarousel>
+              <SeeMoreCTA href={buildViewAllLink(sortKey, null)} text={buildSeeMoreText({ sortKey })} />
+            </section>
+          ))}
 
           {loadedCategoryBlocks.map((block) => (
             <section className="category-block" key={block.category}>
               <div className="category-block-header">
                 <h3 className="cat-title">{block.category}</h3>
               </div>
-
-              <section className="feed-section" aria-labelledby={`newest-${block.category}-heading`}>
-                <HorizontalCarousel
-                  title={`Newest in ${block.category} — Reviews`}
-                  items={block.newest}
-                  loading={loadingGlobal}
-                  skeletonCount={4}
-                  aria-label={`Newest reviews in ${block.category}`}
-                >
-                  {renderCards(block.newest, 'newest')}
-                </HorizontalCarousel>
-
-                <SeeMoreCTA
-                  href={buildViewAllLink('newest', block.category)}
-                  text={buildSeeMoreText({ sortKey: 'newest', category: block.category })}
-                  ariaLabel={`Explore more newest reviews in ${block.category}`}
-                />
-              </section>
-
-              <section className="feed-section" aria-labelledby={`likes-${block.category}-heading`}>
-                <HorizontalCarousel
-                  title={`Most Liked in ${block.category} — Reviews`}
-                  items={block.mostLiked}
-                  loading={loadingGlobal}
-                  skeletonCount={4}
-                  aria-label={`Most liked reviews in ${block.category}`}
-                >
-                  {renderCards(block.mostLiked, 'likes')}
-                </HorizontalCarousel>
-
-                <SeeMoreCTA
-                  href={buildViewAllLink('likes', block.category)}
-                  text={buildSeeMoreText({ sortKey: 'likes', category: block.category })}
-                  ariaLabel={`Explore more most-liked reviews in ${block.category}`}
-                />
-              </section>
-
-              <section className="feed-section" aria-labelledby={`rating-${block.category}-heading`}>
-                <HorizontalCarousel
-                  title={`Highest Rated in ${block.category} — Reviews`}
-                  items={block.highestRated}
-                  loading={loadingGlobal}
-                  skeletonCount={4}
-                  aria-label={`Highest rated reviews in ${block.category}`}
-                >
-                  {renderCards(block.highestRated, 'rating')}
-                </HorizontalCarousel>
-
-                <SeeMoreCTA
-                  href={buildViewAllLink('rating', block.category)}
-                  text={buildSeeMoreText({ sortKey: 'rating', category: block.category })}
-                  ariaLabel={`Explore more highest-rated reviews in ${block.category}`}
-                />
-              </section>
-
-              <section className="feed-section" aria-labelledby={`views-${block.category}-heading`}>
-                <HorizontalCarousel
-                  title={`Most Viewed in ${block.category} — Reviews`}
-                  items={block.mostViewed}
-                  loading={loadingGlobal}
-                  skeletonCount={4}
-                  aria-label={`Most viewed reviews in ${block.category}`}
-                >
-                  {renderCards(block.mostViewed, 'views')}
-                </HorizontalCarousel>
-
-                <SeeMoreCTA
-                  href={buildViewAllLink('views', block.category)}
-                  text={buildSeeMoreText({ sortKey: 'views', category: block.category })}
-                  ariaLabel={`Explore more most-viewed reviews in ${block.category}`}
-                />
-              </section>
+              {[
+                { key: 'newest',       title: 'Newest',        sortKey: 'newest' },
+                { key: 'mostLiked',    title: 'Most Liked',    sortKey: 'likes'  },
+                { key: 'highestRated', title: 'Highest Rated', sortKey: 'rating' },
+                { key: 'mostViewed',   title: 'Most Viewed',   sortKey: 'views'  },
+              ].map(({ key, title, sortKey }) => (
+                <section className="feed-section" key={`${block.category}-${key}`}>
+                  <HorizontalCarousel title={`${title} in ${block.category} — Reviews`} items={block[key]} loading={loadingGlobal} skeletonCount={4}>
+                    {renderCards(block[key], sortKey)}
+                  </HorizontalCarousel>
+                  <SeeMoreCTA
+                    href={buildViewAllLink(sortKey, block.category)}
+                    text={buildSeeMoreText({ sortKey, category: block.category })}
+                  />
+                </section>
+              ))}
             </section>
           ))}
 
