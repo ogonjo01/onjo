@@ -479,79 +479,90 @@ const AIAdviser = ({ theme:T }) => {
     setTimeout(()=>sendChat(question), 80);
   };
 
-  // ── Markdown renderer (same as existing) ─────────────────────────────────
+  // ── Markdown renderer — strips ** bold markers, makes product lines clickable ──
+  const stripBold = (s) => s.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*\*/g, '').trim();
+
   const renderMarkdown = (text, allowClickable=false) => {
     if(!text) return null;
+    // Group consecutive non-header lines into paragraphs for better flow
     const lines = text.split('\n');
-    return lines.map((line, i) => {
-      if(line.startsWith('## ')) return <h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.text, margin:'14px 0 6px', borderBottom:`1px solid ${T.border}`, paddingBottom:4 }}>{line.slice(3)}</h3>;
-      if(line.startsWith('# '))  return <h2 key={i} style={{ fontSize:15, fontWeight:800, color:T.text, margin:'16px 0 8px' }}>{line.slice(2)}</h2>;
-      if(line.startsWith('### ')) return <h4 key={i} style={{ fontSize:12, fontWeight:700, color:T.accent, margin:'10px 0 4px' }}>{line.slice(4)}</h4>;
+    return lines.map((rawLine, i) => {
+      const line = rawLine; // keep raw for prefix checks, strip bold for display
 
-      // Clickable bullet for titles/product names (lines starting with "- **" or "- 🔥" etc.)
-      if((line.startsWith('- **') || line.startsWith('• **')) && allowClickable) {
-        const inner = line.replace(/^[-•]\s*\*\*/, '').replace(/\*\*.*/, '').trim();
-        const rest  = line.replace(/^[-•]\s*\*\*[^*]+\*\*/, '').trim();
-        return(
-          <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8, padding:'8px 10px', background:T.surface, borderRadius:8, border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }}
-            onMouseEnter={e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.background=T.accent+'10'; }}
-            onMouseLeave={e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.surface; }}
-            onClick={()=>askInChat(`Give me a full review outline for: "${inner}" — including verdict structure, where to place affiliate CTAs, pros/cons framework, and SEO title options.`)}>
-            <span style={{ color:T.accent, flexShrink:0, marginTop:1 }}>•</span>
-            <div style={{ flex:1, minWidth:0 }}>
-              <span style={{ fontSize:12, fontWeight:700, color:T.text }}>{inner}</span>
-              {rest && <span style={{ fontSize:11, color:T.textSub, marginLeft:6 }}>{rest}</span>}
-              <div style={{ fontSize:10, color:T.accent, marginTop:3, fontWeight:600 }}>→ Click to get review outline + CTA strategy</div>
+      if(line.startsWith('### ')) return <h4 key={i} style={{ fontSize:12, fontWeight:700, color:T.accent, margin:'10px 0 4px', textTransform:'uppercase', letterSpacing:0.8 }}>{stripBold(line.slice(4))}</h4>;
+      if(line.startsWith('## '))  return <h3 key={i} style={{ fontSize:13, fontWeight:700, color:T.text, margin:'14px 0 6px', borderBottom:`1px solid ${T.border}`, paddingBottom:4 }}>{stripBold(line.slice(3))}</h3>;
+      if(line.startsWith('# '))   return <h2 key={i} style={{ fontSize:15, fontWeight:800, color:T.text, margin:'16px 0 8px' }}>{stripBold(line.slice(2))}</h2>;
+      if(line.startsWith('---'))  return <hr key={i} style={{ border:'none', borderTop:`1px solid ${T.border}`, margin:'10px 0' }}/>;
+      if(!line.trim())            return <div key={i} style={{ height:6 }}/>;
+
+      // Bullet lines — always clickable in allowClickable mode
+      const isBullet = line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ');
+      if(isBullet) {
+        const raw = line.replace(/^[-•*]\s+/, '');
+        const display = stripBold(raw);
+        const clickText = display.split(':')[0].split('–')[0].split('(')[0].trim();
+        if(allowClickable && display.length > 10) {
+          return(
+            <div key={i} onClick={()=>askInChat(`Give me a complete review outline and affiliate CTA placement guide for: "${clickText}"`)}
+              style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8,
+                padding:'9px 12px', background:T.surface, borderRadius:9,
+                border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.background=T.accent+'12'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.surface; }}>
+              <span style={{ color:T.accent, flexShrink:0, marginTop:2, fontSize:14 }}>•</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:T.text, lineHeight:1.5 }}>{display}</div>
+                <div style={{ fontSize:10, color:T.accent, marginTop:3, fontWeight:600 }}>→ Get review outline + CTA strategy</div>
+              </div>
             </div>
-          </div>
-        );
-      }
-
-      if(line.startsWith('- ') || line.startsWith('• ')) {
-        const content = line.slice(2);
-        // Check if it looks like a product/title line we should make clickable
-        const isProductLine = /^[A-Z]/.test(content) && content.length > 15 && allowClickable;
+          );
+        }
         return(
-          <div key={i} style={{ display:'flex', gap:7, marginBottom:isProductLine?6:3,
-            ...(isProductLine?{ padding:'6px 10px', background:T.surface, borderRadius:7, border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }:{})
-          }}
-            onMouseEnter={isProductLine?e=>{ e.currentTarget.style.borderColor=T.accent; }:undefined}
-            onMouseLeave={isProductLine?e=>{ e.currentTarget.style.borderColor=T.border; }:undefined}
-            onClick={isProductLine?()=>askInChat(`Give me a full review outline + affiliate CTA strategy for: "${content.split(':')[0].trim()}"`)  :undefined}
-          >
+          <div key={i} style={{ display:'flex', gap:7, marginBottom:4 }}>
             <span style={{ color:T.accent, flexShrink:0 }}>•</span>
-            <div>
-              <span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{content}</span>
-              {isProductLine && <div style={{ fontSize:10, color:T.accent, marginTop:2, fontWeight:600 }}>→ Get outline</div>}
-            </div>
+            <span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{display}</span>
           </div>
         );
       }
 
-      if(/^\d+\./.test(line)) {
-        const num = line.match(/^\d+/)[0];
-        const content = line.replace(/^\d+\.\s*/,'');
-        const isClickable = allowClickable && /^[A-Z"]/.test(content) && content.length > 20;
+      // Numbered lines — always clickable in allowClickable mode
+      const numMatch = line.match(/^(\d+)[.)\s]/);
+      if(numMatch) {
+        const num = numMatch[1];
+        const raw = line.replace(/^\d+[.)\s]+/, '');
+        const display = stripBold(raw);
+        const clickText = display.split(':')[0].split('–')[0].split('(')[0].trim();
+        if(allowClickable && display.length > 10) {
+          return(
+            <div key={i} onClick={()=>askInChat(`Give me a complete review outline and affiliate CTA placement guide for: "${clickText}"`)}
+              style={{ display:'flex', alignItems:'flex-start', gap:9, marginBottom:8,
+                padding:'9px 12px', background:T.surface, borderRadius:9,
+                border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.background=T.accent+'12'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.surface; }}>
+              <span style={{ color:T.accent, fontWeight:800, flexShrink:0, fontSize:13, minWidth:20 }}>{num}.</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:T.text, lineHeight:1.5 }}>{display}</div>
+                <div style={{ fontSize:10, color:T.accent, marginTop:3, fontWeight:600 }}>→ Get review outline + CTA strategy</div>
+              </div>
+            </div>
+          );
+        }
         return(
-          <div key={i} style={{ display:'flex', gap:8, marginBottom:isClickable?8:4,
-            ...(isClickable?{ padding:'8px 10px', background:T.surface, borderRadius:8, border:`1px solid ${T.border}`, cursor:'pointer', transition:'all 0.15s' }:{})
-          }}
-            onMouseEnter={isClickable?e=>{ e.currentTarget.style.borderColor=T.accent; e.currentTarget.style.background=T.accent+'10'; }:undefined}
-            onMouseLeave={isClickable?e=>{ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.surface; }:undefined}
-            onClick={isClickable?()=>askInChat(`Give me a full review outline + affiliate CTA placement for: "${content.split(':')[0].trim()}"`)  :undefined}
-          >
+          <div key={i} style={{ display:'flex', gap:8, marginBottom:4 }}>
             <span style={{ color:T.accent, fontWeight:700, flexShrink:0, fontSize:11, minWidth:16 }}>{num}.</span>
-            <div>
-              <span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{content}</span>
-              {isClickable && <div style={{ fontSize:10, color:T.accent, marginTop:2, fontWeight:600 }}>→ Get full outline + CTA placement</div>}
-            </div>
+            <span style={{ fontSize:12, color:T.textSub, lineHeight:1.5 }}>{display}</span>
           </div>
         );
       }
 
-      if(line.startsWith('**') && line.endsWith('**')) return <p key={i} style={{ fontSize:12, fontWeight:700, color:T.text, margin:'8px 0 3px' }}>{line.slice(2,-2)}</p>;
-      if(!line.trim()) return <div key={i} style={{ height:6 }}/>;
-      return <p key={i} style={{ fontSize:12, color:T.textSub, margin:'2px 0', lineHeight:1.6 }}>{line}</p>;
+      // Bold-only line = subheading
+      if(line.startsWith('**') && line.endsWith('**')) {
+        return <p key={i} style={{ fontSize:12, fontWeight:700, color:T.text, margin:'8px 0 3px' }}>{line.slice(2,-2)}</p>;
+      }
+
+      // Regular paragraph — strip inline bold markers
+      return <p key={i} style={{ fontSize:12, color:T.textSub, margin:'2px 0', lineHeight:1.6 }}>{stripBold(line)}</p>;
     });
   };
 

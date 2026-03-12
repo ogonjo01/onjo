@@ -16,14 +16,30 @@ Be concise, practical, and specific. Use bullet points and structure when helpfu
 Focus on: review structure, verdict writing, affiliate strategy, reader trust, SEO, and content quality.
 Today is March 2026.`,
 
-  trending: `You are a product trend analyst for ONJO Reviews.
-Identify trending product categories and specific products that review sites should be covering right now.
-Format your response with clear sections:
-## 🔥 Hot Categories Right Now
-## 📱 Specific Products to Review This Week
-## 📈 Rising Search Terms
-## ⚡ Quick Win Opportunities
-Be specific with product names, categories, and why they're trending. Keep it actionable. Today is March 2026.`,
+  trending: `You are a product trend analyst for ONJO Reviews, a product review and affiliate platform.
+Search for what products people are actively looking to buy right now. Return SPECIFIC product names, not categories.
+Format your response EXACTLY like this with numbered lists:
+
+## 🔥 Top Products to Review This Week
+1. [Specific Product Name] — [why it's trending, estimated search volume, affiliate commission tier]
+2. [Specific Product Name] — [why it's trending, estimated search volume, affiliate commission tier]
+3. [Specific Product Name] — [why it's trending, estimated search volume, affiliate commission tier]
+4. [Specific Product Name] — [reason]
+5. [Specific Product Name] — [reason]
+
+## 📈 Rising Search Terms (use these as review titles)
+1. "Best [product] under $[price]" — [monthly searches estimate]
+2. "[Product] vs [Product] comparison" — [monthly searches estimate]
+3. "[Product] review [year]" — [monthly searches estimate]
+4. "Is [product] worth it?" — [monthly searches estimate]
+5. "Cheapest [product] that still works" — [monthly searches estimate]
+
+## ⚡ Quick Win Reviews (low competition, high buyer intent)
+1. [Specific product + title idea] — [reason it's a quick win]
+2. [Specific product + title idea] — [reason it's a quick win]
+3. [Specific product + title idea] — [reason it's a quick win]
+
+Be specific with real product names. Each item must be a specific reviewable product, not a generic category. Today is March 2026.`,
 
   recommendations: `You are an affiliate revenue strategist for ONJO Reviews, a product review platform.
 Suggest product review ideas ranked by affiliate conversion potential and buyer intent.
@@ -63,7 +79,7 @@ async function callGemini(prompt, systemPrompt, useGrounding = false) {
   const body = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 3000 },
   };
 
   if (useGrounding) {
@@ -152,7 +168,37 @@ function getDefaultTopic(mode) {
 function buildPrompt(mode, topic) {
   if (mode === 'news') return `Search the web for the latest news about: "${topic}"\nWhat major products launched recently? What controversies are circulating? What are people searching for and buying? What specific review articles should we publish this week? Use real current product names and brands.`;
   if (mode === 'trending') return `Search the web: what products and categories are trending RIGHT NOW for review content in: "${topic}"? Give specific product names, brands, current search trends, and why they're hot. What should a review site publish this week for maximum traffic?`;
-  if (mode === 'recommendations') return `Generate content ideas for a product review site focused on: "${topic}". What review articles, comparisons, and buying guides should they create to capture buyer-intent traffic, fill content gaps, drive affiliate conversions, and build topical authority? Be specific with titles and keyword opportunities.`;
+  if (mode === 'recommendations') return `Generate affiliate-optimized product review ideas for ONJO Reviews focused on: "${topic}".
+
+Format your response EXACTLY like this with numbered lists:
+
+## 💰 Highest Affiliate Commission Reviews
+1. [Specific Product Name] Review: Is It Worth It? — [estimated commission: $X per sale, affiliate program name]
+2. [Specific Product Name] Review: [angle] — [estimated commission]
+3. [Specific Product Name]: [angle] — [estimated commission]
+4. [Specific Product Name]: [angle] — [estimated commission]
+5. [Specific Product Name]: [angle] — [estimated commission]
+
+## 🔥 Comparison Posts That Convert
+1. [Product A] vs [Product B]: Which Should You Buy? — [why this converts, buyer intent level]
+2. [Product A] vs [Product B]: [angle] — [conversion reason]
+3. Best [Category] Under $[Price]: [Year] — [search volume estimate]
+4. [Product] Alternatives: [X] Cheaper Options — [buyer intent]
+5. [Product] vs [Product] vs [Product]: Full Comparison — [conversion reason]
+
+## ⚡ Quick Win Low-Competition Reviews
+1. [Specific Product] — [why low competition, estimated monthly searches]
+2. [Specific Product] — [why low competition, estimated monthly searches]
+3. [Specific Product] — [why low competition, estimated monthly searches]
+
+## 🎯 Buyer Intent Keywords to Target
+1. "best [specific product type] for [specific use case]" — [monthly searches]
+2. "[product name] review [year]" — [monthly searches]
+3. "is [product] worth buying" — [monthly searches]
+4. "[product] pros and cons" — [monthly searches]
+5. "cheapest [product] that [benefit]" — [monthly searches]
+
+Use real, specific product names in every item. Each numbered item must be immediately actionable.`;
   if (mode === 'seo') return `Give specific, actionable SEO advice for a product review site in this niche: "${topic}". Cover: title optimization, schema markup, featured snippets, internal linking, keyword targeting, and quick wins for 2025-2026.`;
   return `Help me with "${topic}" for my product review platform.`;
 }
