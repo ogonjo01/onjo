@@ -622,8 +622,13 @@ const AIAdviser = ({ theme:T }) => {
                   background:msg.role==='user'?T.accent:T.surface,
                   color:msg.role==='user'?'#fff':T.text,
                   border:`1px solid ${msg.role==='user'?'transparent':T.border}`,
-                  fontSize:12, lineHeight:1.65, whiteSpace:'pre-wrap', wordBreak:'break-word',
-                }}>{msg.content}</div>
+                  fontSize:12, lineHeight:1.65,
+                }}>
+                  {msg.role==='user'
+                    ? <span style={{ whiteSpace:'pre-wrap', wordBreak:'break-word' }}>{msg.content}</span>
+                    : <div style={{ wordBreak:'break-word' }}>{renderMarkdown(msg.content, false)}</div>
+                  }
+                </div>
               </div>
             ))}
             {chatLoading&&(
