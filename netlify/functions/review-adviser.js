@@ -1,15 +1,14 @@
 // netlify/functions/review-adviser.js
-// ONJO Reviews AI Adviser — Edge Function (matches ai-advisor.js pattern exactly)
+// ONJO Reviews AI Adviser — Regular Netlify Function (matches netlify.toml setup)
 // Modes: chat | trending | recommendations | seo | news
 
-const MODEL       = 'gemini-2.0-flash';
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const MODEL          = 'gemini-2.0-flash';
+const GEMINI_BASE    = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// ── In-memory cache ───────────────────────────────────────────────────────────
-const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const CACHE_TTL = 6 * 60 * 60 * 1000;
 if (!globalThis._reviewCache) globalThis._reviewCache = {};
 
-// ── System prompts ────────────────────────────────────────────────────────────
 const SYSTEM_PROMPTS = {
   chat: `You are an expert product review strategist and content coach for ONJO Reviews, a product review platform.
 You help content creators write better, more trustworthy, and more SEO-effective product reviews.
@@ -55,189 +54,104 @@ Format your response with clear sections:
 Be specific about actual products, brands, and why they matter for review content. Today is March 2026.`,
 };
 
-// ── Main handler ──────────────────────────────────────────────────────────────
-export default async (request) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin':  '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+async function callGemini(prompt, systemPrompt, useGrounding = false) {
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not set in Netlify environment variables.');
+  }
+
+  const body = {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
   };
 
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
+  if (useGrounding) {
+    body.tools = [{ google_search: {} }];
   }
 
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+  const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${errText}`);
   }
 
-  const apiKey = Netlify.env.get('GEMINI_API_KEY');
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: 'GEMINI_API_KEY not set in Netlify environment variables.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
+  const data = await res.json();
+  // Handle thinking models that return thought + text parts
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  return parts.find(p => p.text && !p.thought)?.text || parts[0]?.text || 'No response generated.';
+}
+
+exports.handler = async (event) => {
+  const headers = {
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type':                 'application/json',
+  };
+
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  let body;
+  let mode, message, customTopic;
   try {
-    body = await request.json();
+    ({ mode, message, customTopic } = JSON.parse(event.body || '{}'));
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON body' }) };
   }
-
-  const { mode, message, customTopic } = body;
 
   if (!mode) {
-    return new Response(JSON.stringify({ error: 'Missing mode parameter' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing mode' }) };
   }
 
   try {
-    // ── CHAT — no cache, no grounding ──────────────────────────────────────
+    // ── CHAT — no cache ──────────────────────────────────────────────────────
     if (mode === 'chat') {
       const userMsg = (message || '').trim();
-      if (!userMsg) {
-        return new Response(JSON.stringify({ error: 'Empty message' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
-      }
-
-      const geminiBody = {
-        system_instruction: { parts: [{ text: SYSTEM_PROMPTS.chat }] },
-        contents: [{ role: 'user', parts: [{ text: userMsg }] }],
-        generationConfig: { maxOutputTokens: 1500, temperature: 0.75 },
-      };
-
-      const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiBody),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Gemini API error ${res.status}: ${errText}`);
-      }
-
-      const data = await res.json();
-      const result = data?.candidates?.[0]?.content?.parts?.find(p => p.text && !p.thought)?.text
-        || data?.candidates?.[0]?.content?.parts?.[0]?.text
-        || 'No response generated.';
-
-      return new Response(JSON.stringify({ result }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      if (!userMsg) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Empty message' }) };
+      const result = await callGemini(userMsg, SYSTEM_PROMPTS.chat, false);
+      return { statusCode: 200, headers, body: JSON.stringify({ result }) };
     }
 
-    // ── Non-chat modes: check cache first ─────────────────────────────────
-    const topic    = (customTopic || message || '').trim() || getDefaultTopic(mode);
+    // ── Cached modes ─────────────────────────────────────────────────────────
+    const topic    = (customTopic || message || getDefaultTopic(mode)).trim();
     const cacheKey = `${mode}:${topic}`;
     const cached   = globalThis._reviewCache[cacheKey];
 
     if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
-      return new Response(JSON.stringify({ result: cached.data }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders, 'X-Cache': 'HIT' },
-      });
+      return { statusCode: 200, headers: { ...headers, 'X-Cache': 'HIT' }, body: JSON.stringify({ result: cached.data }) };
     }
 
-    // ── Build prompt & decide grounding ───────────────────────────────────
     const useGrounding = mode === 'news' || mode === 'trending';
-    const prompt       = buildPrompt(mode, topic);
-    const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.chat;
+    const result = await callGemini(buildPrompt(mode, topic), SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.chat, useGrounding);
 
-    const geminiBody = {
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 1500, temperature: 0.7 },
-      ...(useGrounding ? { tools: [{ google_search: {} }] } : {}),
-    };
-
-    const res = await fetch(`${GEMINI_BASE}/${MODEL}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(geminiBody),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Gemini API error ${res.status}: ${errText}`);
-    }
-
-    const data = await res.json();
-    const result = data?.candidates?.[0]?.content?.parts?.find(p => p.text && !p.thought)?.text
-      || data?.candidates?.[0]?.content?.parts?.[0]?.text
-      || 'No response generated.';
-
-    // Cache it
     globalThis._reviewCache[cacheKey] = { data: result, ts: Date.now() };
-
-    return new Response(JSON.stringify({ result }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders, 'X-Cache': 'MISS' },
-    });
+    return { statusCode: 200, headers: { ...headers, 'X-Cache': 'MISS' }, body: JSON.stringify({ result }) };
 
   } catch (err) {
     console.error('review-adviser error:', err.message);
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: err.message }),
+    };
   }
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function getDefaultTopic(mode) {
-  const defaults = {
-    trending:        'consumer products and tech gadgets',
-    recommendations: 'product reviews and buying guides',
-    seo:             'product review website',
-    news:            'consumer tech and new product launches',
-  };
-  return defaults[mode] || 'product reviews';
+  return { trending: 'consumer products and tech gadgets', recommendations: 'product reviews and buying guides', seo: 'product review website', news: 'consumer tech and new product launches' }[mode] || 'product reviews';
 }
 
 function buildPrompt(mode, topic) {
-  if (mode === 'news') {
-    return `Search the web for the latest news about: "${topic}"
-Give me a detailed breakdown for ONJO Reviews content creators:
-- What major products launched or were announced recently?
-- What product controversies or viral stories are circulating?
-- What are people searching for and buying right now in this space?
-- What specific review articles should we publish this week based on this news?
-Provide real, current information with specific product names and brands.`;
-  }
-  if (mode === 'trending') {
-    return `Search the web: what products and categories are trending RIGHT NOW for review content in the niche: "${topic}"?
-Provide specific product names, brands, current search trends, and why they're hot right now.
-What should a product review site be publishing this week to capture maximum traffic?`;
-  }
-  if (mode === 'recommendations') {
-    return `Generate content ideas for a product review site focused on: "${topic}".
-What review articles, comparisons, and buying guides should they create to:
-1. Capture high buyer-intent search traffic
-2. Fill underserved content gaps in the market
-3. Drive affiliate conversions
-4. Build topical authority on Google
-Be specific with titles, product categories, and keyword opportunities.`;
-  }
-  if (mode === 'seo') {
-    return `Give me specific, actionable SEO advice for a product review site in this niche: "${topic}".
-Cover: title optimization, schema markup, featured snippets, internal linking, keyword targeting, and quick wins.
-Focus on tactics that work in 2025-2026 for review-focused content ranking on Google.`;
-  }
+  if (mode === 'news') return `Search the web for the latest news about: "${topic}"\nWhat major products launched recently? What controversies are circulating? What are people searching for and buying? What specific review articles should we publish this week? Use real current product names and brands.`;
+  if (mode === 'trending') return `Search the web: what products and categories are trending RIGHT NOW for review content in: "${topic}"? Give specific product names, brands, current search trends, and why they're hot. What should a review site publish this week for maximum traffic?`;
+  if (mode === 'recommendations') return `Generate content ideas for a product review site focused on: "${topic}". What review articles, comparisons, and buying guides should they create to capture buyer-intent traffic, fill content gaps, drive affiliate conversions, and build topical authority? Be specific with titles and keyword opportunities.`;
+  if (mode === 'seo') return `Give specific, actionable SEO advice for a product review site in this niche: "${topic}". Cover: title optimization, schema markup, featured snippets, internal linking, keyword targeting, and quick wins for 2025-2026.`;
   return `Help me with "${topic}" for my product review platform.`;
 }
-
-export const config = { path: '/api/review-adviser' };
