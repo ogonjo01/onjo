@@ -1,28 +1,48 @@
 # ── ONJO Reviews netlify.toml ──────────────────────────────────────────────
+
 [build]
-  command = "npm run build"
+  command   = "npm run build"
   functions = "netlify/functions"
-  publish = "dist"
+  publish   = "dist"
 
 [dev]
-  functions = "netlify/functions"
-  command = "npm run dev"
-  port = 8081
-  targetPort = 8082
+  functions   = "netlify/functions"
+  command     = "npm run dev"
+  port        = 8081
+  targetPort  = 8082
 
-# review-adviser MUST come before /* or the catch-all swallows it
+# ── Edge Functions ──────────────────────────────────────────────────────────
+# Must be declared BEFORE the catch-all /* redirect so Netlify routes
+# crawlers through the SEO injector before falling back to index.html.
+
+[[edge_functions]]
+  path     = "/review/*"
+  function = "seo-inject"
+
+[[edge_functions]]
+  path     = "/summary/*"
+  function = "seo-inject"
+
+# ── Redirects ───────────────────────────────────────────────────────────────
+# Order matters: specific rules first, catch-all last.
+
+# 1. Serverless function for review adviser API
 [[redirects]]
-  from = "/api/review-adviser"
-  to = "/.netlify/functions/review-adviser"
+  from   = "/api/review-adviser"
+  to     = "/.netlify/functions/review-adviser"
   status = 200
 
+# 2. Canonical redirect: old /summary/* URLs → /review/*
+#    (force = true ensures this fires even when the file exists in dist)
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/summary/*"
-  to = "/review/:splat"
+  from   = "/summary/*"
+  to     = "/review/:splat"
   status = 301
-  force = true
+  force  = true
+
+# 3. SPA catch-all — serves index.html for every unmatched route so
+#    React Router can handle client-side navigation.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

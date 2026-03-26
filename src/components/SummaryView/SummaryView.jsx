@@ -12,7 +12,6 @@ import './SummaryView.css';
 
 const SELECT_WITH_COUNTS = `*,
   likes_count:likes!likes_post_id_fkey(count),
-  views_count:views!views_post_id_fkey(count),
   comments_count:comments!comments_post_id_fkey(count)
 `;
 
@@ -26,13 +25,16 @@ const toNum = (v) => {
 
 const normalizeRow = (r = {}) => {
   const tags = Array.isArray(r.tags)
-    ? r.tags.map(t => (typeof t === 'string' ? t.trim().toLowerCase() : String(t)))
+    ? r.tags.map((t) => (typeof t === 'string' ? t.trim().toLowerCase() : String(t)))
     : [];
 
-  const ratingCountRaw = r.rating_count
-    ?? r.ratings_count
-    ?? (Array.isArray(r.rating_count_aggregate) ? (r.rating_count_aggregate[0]?.count ?? 0) : 0)
-    ?? 0;
+  const ratingCountRaw =
+    r.rating_count ??
+    r.ratings_count ??
+    (Array.isArray(r.rating_count_aggregate)
+      ? (r.rating_count_aggregate[0]?.count ?? 0)
+      : 0) ??
+    0;
 
   return {
     id: r.id,
@@ -48,7 +50,7 @@ const normalizeRow = (r = {}) => {
     tags,
     user_id: r.user_id ?? null,
     likes_count: toNum(r.likes_count),
-    views_count: toNum(r.views_count),
+    views_count: Number(r.views_count ?? 0),
     comments_count: toNum(r.comments_count),
     avg_rating: Number(r.avg_rating ?? 0),
     rating_count: Number(ratingCountRaw),
@@ -83,7 +85,7 @@ const makeSafeDescription = (raw = '', maxLen = 140) => {
 };
 
 const buildLightItem = (nr = {}, src = {}) => {
-  let rawDesc =
+  const rawDesc =
     (src.description !== undefined ? src.description : null) ??
     (nr.description !== undefined ? nr.description : null) ??
     src.desc ??
@@ -91,7 +93,7 @@ const buildLightItem = (nr = {}, src = {}) => {
     src.short_description ??
     null;
 
-  let description = String(rawDesc || '').trim();
+  const description = String(rawDesc || '').trim();
   const safeDesc = makeSafeDescription(description, 140);
 
   return {
@@ -117,7 +119,6 @@ const SummaryView = () => {
   const { param } = useParams();
   const navigate = useNavigate();
 
-  /* States */
   const [summary, setSummary] = useState(null);
   const [postId, setPostId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,13 +141,9 @@ const SummaryView = () => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
 
-  /* Refs */
   const pageRef = useRef(null);
   const headerRef = useRef(null);
 
-  /* ---------- Hooks (always called, in fixed order) ---------- */
-
-  // Get current user id (if logged in)
   useEffect(() => {
     (async () => {
       try {
@@ -158,52 +155,36 @@ const SummaryView = () => {
     })();
   }, []);
 
-  // Scroll to top when param changes — robust across SPA scroll containers and browsers
   useEffect(() => {
     try {
       const scrollToTop = () => {
         try {
-          // If there's a dedicated main-content scroll container, prefer that
           const main = document.querySelector('.main-content');
           if (main && typeof main.scrollTo === 'function') {
             main.scrollTo({ top: 0, behavior: 'auto' });
             return;
           }
-
-          // If the summary page wrapper is scrollable, reset that
-          if (pageRef && pageRef.current && typeof pageRef.current.scrollTo === 'function') {
+          if (pageRef.current && typeof pageRef.current.scrollTo === 'function') {
             pageRef.current.scrollTo({ top: 0, behavior: 'auto' });
             return;
           }
-
-          // Fallback to window/document
           if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
             window.scrollTo(0, 0);
-            // also reset common fallbacks
-            if (document && document.documentElement) document.documentElement.scrollTop = 0;
-            if (document && document.body) document.body.scrollTop = 0;
+            if (document?.documentElement) document.documentElement.scrollTop = 0;
+            if (document?.body) document.body.scrollTop = 0;
           }
-        } catch (e) {
-          // non-fatal
-          // console.debug('scrollToTop inner error', e);
-        }
+        } catch (e) {}
       };
-
-      // run immediately when route param changes
       scrollToTop();
-    } catch (e) {
-      // swallow — scroll is best-effort
-    }
+    } catch (e) {}
   }, [param]);
-
-  /* Recommendation functions (defined before use) */
 
   const fetchRecommendedByTags = useCallback(async (tags = [], limit = 10, resolvedPostId = null) => {
     setIsRecommending(true);
     setRecError(null);
     try {
       const lowerTags = (Array.isArray(tags) ? tags : [])
-        .map(t => (t || '').toLowerCase().trim())
+        .map((t) => (t || '').toLowerCase().trim())
         .filter(Boolean);
 
       if (lowerTags.length === 0) {
@@ -223,8 +204,8 @@ const SummaryView = () => {
            category,
            avg_rating,
            likes_count:likes!likes_post_id_fkey(count),
-           views_count:views!views_post_id_fkey(count),
            comments_count:comments!comments_post_id_fkey(count),
+           views_count,
            tags,
            user_id,
            created_at`
@@ -235,17 +216,17 @@ const SummaryView = () => {
       if (error) throw error;
 
       const rows = (data || [])
-        .map(d => {
+        .map((d) => {
           const nr = normalizeRow(d);
           return buildLightItem(nr, d);
         })
-        .filter(r => {
-          const postTags = Array.isArray(r.tags) ? r.tags.map(t => (t || '').toLowerCase().trim()) : [];
-          return postTags.some(t => lowerTags.includes(t));
+        .filter((r) => {
+          const postTags = Array.isArray(r.tags) ? r.tags.map((t) => (t || '').toLowerCase().trim()) : [];
+          return postTags.some((t) => lowerTags.includes(t));
         })
-        .map(r => {
-          const postTags = Array.isArray(r.tags) ? r.tags.map(t => (t || '').toLowerCase().trim()) : [];
-          const matchCount = postTags.filter(t => lowerTags.includes(t)).length;
+        .map((r) => {
+          const postTags = Array.isArray(r.tags) ? r.tags.map((t) => (t || '').toLowerCase().trim()) : [];
+          const matchCount = postTags.filter((t) => lowerTags.includes(t)).length;
           return { r, matchCount };
         });
 
@@ -258,7 +239,7 @@ const SummaryView = () => {
         return tb - ta;
       });
 
-      const top = rows.map(x => x.r).slice(0, limit);
+      const top = rows.map((x) => x.r).slice(0, limit);
       setRecommendedContent(top);
       return top;
     } catch (err) {
@@ -276,7 +257,10 @@ const SummaryView = () => {
     setRecError(null);
     try {
       const cat = String(category ?? '').trim();
-      if (!cat) { setRecommendedContent([]); return []; }
+      if (!cat) {
+        setRecommendedContent([]);
+        return [];
+      }
 
       const { data, error } = await supabase
         .from('book_summaries')
@@ -290,8 +274,8 @@ const SummaryView = () => {
            category,
            avg_rating,
            likes_count:likes!likes_post_id_fkey(count),
-           views_count:views!views_post_id_fkey(count),
            comments_count:comments!comments_post_id_fkey(count),
+           views_count,
            tags,
            user_id,
            created_at`
@@ -302,10 +286,12 @@ const SummaryView = () => {
 
       if (error) throw error;
 
-      const rows = (data || []).map(d => {
-        const nr = normalizeRow(d);
-        return buildLightItem(nr, d);
-      }).filter(r => String(r.id) !== String(resolvedPostId));
+      const rows = (data || [])
+        .map((d) => {
+          const nr = normalizeRow(d);
+          return buildLightItem(nr, d);
+        })
+        .filter((r) => String(r.id) !== String(resolvedPostId));
 
       rows.sort((a, b) => {
         const vb = Number(b.views_count || 0);
@@ -332,10 +318,41 @@ const SummaryView = () => {
     }
   }, []);
 
-  /* ---------- Data loading ---------- */
+  const recordView = useCallback(async (resolvedPostId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('views').insert([
+        {
+          post_id: resolvedPostId,
+          user_id: user?.id ?? null,
+        },
+      ]);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error inserting view:', err);
+    }
+  }, []);
+
+  const refreshViewsCount = useCallback(async (resolvedPostId) => {
+    try {
+      const { data, error } = await supabase
+        .from('book_summaries')
+        .select('views_count')
+        .eq('id', resolvedPostId)
+        .single();
+
+      if (!error && data) {
+        setViews(Number(data.views_count) || 0);
+      }
+    } catch (err) {
+      console.error('Error refreshing views count:', err);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
+
     const loadMinimalSummary = async () => {
       setIsLoading(true);
       setSummary(null);
@@ -356,6 +373,7 @@ const SummaryView = () => {
              youtube_url,
              tags,
              user_id,
+             views_count,
              created_at`
           )
           .eq('slug', param)
@@ -363,8 +381,10 @@ const SummaryView = () => {
 
         let data = slugData ?? null;
         let fetchedBy = null;
-        if (data) fetchedBy = 'slug';
-        else {
+
+        if (data) {
+          fetchedBy = 'slug';
+        } else {
           const { data: idData } = await supabase
             .from('book_summaries')
             .select(
@@ -379,15 +399,18 @@ const SummaryView = () => {
                youtube_url,
                tags,
                user_id,
+               views_count,
                created_at`
             )
             .eq('id', param)
             .maybeSingle();
+
           data = idData ?? null;
           if (data) fetchedBy = 'id';
         }
 
         if (!mounted) return;
+
         if (!data) {
           setIsLoading(false);
           setSummary(null);
@@ -400,20 +423,19 @@ const SummaryView = () => {
         }
 
         const normalized = normalizeRow(data);
-        normalized.category = (normalized?.category == null) ? '' : String(normalized.category).trim();
+        normalized.category = normalized?.category == null ? '' : String(normalized.category).trim();
 
         setSummary(normalized);
         setPostId(normalized.id);
         setOwnerId(normalized.user_id ?? null);
 
         setLikes(0);
-        setViews(0);
+        setViews(Number(normalized.views_count) || 0);
         setCommentsCount(0);
 
         setIsLoading(false);
 
-        // fetch followups (counts, ratings, views increment, recommendations)
-        backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags).catch((e) => console.debug(e));
+        backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags, true).catch((e) => console.debug(e));
       } catch (err) {
         console.error('Error loading minimal summary:', err);
         if (mounted) {
@@ -425,11 +447,12 @@ const SummaryView = () => {
     };
 
     loadMinimalSummary();
-    return () => { mounted = false; };
-  }, [param, navigate]); // end useEffect loadMinimalSummary
+    return () => {
+      mounted = false;
+    };
+  }, [param, navigate]);
 
-  /* backgroundFetchFollowups placed after recommendation functions to ensure they exist */
-  const backgroundFetchFollowups = async (resolvedPostId, category = '', tags = []) => {
+  const backgroundFetchFollowups = async (resolvedPostId, category = '', tags = [], shouldIncrementView = true) => {
     try {
       const { data, error } = await supabase
         .from('book_summaries')
@@ -439,8 +462,8 @@ const SummaryView = () => {
 
       if (!error && data) {
         const formatted = normalizeRow(data);
-        formatted.category = (formatted?.category == null) ? '' : String(formatted.category).trim();
-        setSummary((prev) => prev ? { ...prev, ...formatted } : formatted);
+        formatted.category = formatted?.category == null ? '' : String(formatted.category).trim();
+        setSummary((prev) => (prev ? { ...prev, ...formatted } : formatted));
         setOwnerId(formatted.user_id ?? null);
         setLikes(formatted.likes_count || 0);
         setViews(formatted.views_count || 0);
@@ -461,17 +484,17 @@ const SummaryView = () => {
             supabase.from('likes').select('id').eq('post_id', resolvedPostId).eq('user_id', user.id),
             supabase.from('ratings').select('rating').eq('post_id', resolvedPostId).eq('user_id', user.id).maybeSingle(),
           ]);
+
           if (likesRes?.data && likesRes.data.length) setUserHasLiked(true);
           if (ratingRes?.data && ratingRes.data.rating) setUserRating(ratingRes.data.rating);
         }
       } catch (e) {}
 
-      try {
-        await supabase.rpc('increment_views', { post_id: resolvedPostId });
-        setViews((v) => (Number(v) || 0) + 1);
-      } catch (e) {}
+      if (shouldIncrementView) {
+        await recordView(resolvedPostId);
+        await refreshViewsCount(resolvedPostId);
+      }
 
-      // Use tags-based recommendations if available; fallback to category if not
       if (Array.isArray(tags) && tags.length > 0) {
         fetchRecommendedByTags(tags, 10, resolvedPostId).catch(() => {});
       } else if ((category ?? '').trim()) {
@@ -484,13 +507,17 @@ const SummaryView = () => {
     }
   };
 
-  /* ---------- Interaction handlers ---------- */
-
   const handleLike = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert('Please sign in to like summaries.'); return; }
-      if (!postId) { alert('Post not ready. Please try again.'); return; }
+      if (!user) {
+        alert('Please sign in to like summaries.');
+        return;
+      }
+      if (!postId) {
+        alert('Post not ready. Please try again.');
+        return;
+      }
 
       if (userHasLiked) {
         const { error } = await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
@@ -512,14 +539,20 @@ const SummaryView = () => {
   const saveRating = async (value) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert('Please sign in to rate'); return false; }
-      if (!postId) { alert('Post not ready. Try again later.'); return false; }
+      if (!user) {
+        alert('Please sign in to rate');
+        return false;
+      }
+      if (!postId) {
+        alert('Post not ready. Try again later.');
+        return false;
+      }
 
       setSavingRating(true);
-      const { data, error } = await supabase.rpc('rate_post', {
+      const { error } = await supabase.rpc('rate_post', {
         p_post_id: postId,
         p_user_id: user.id,
-        p_rating: value
+        p_rating: value,
       });
 
       if (error) {
@@ -576,7 +609,6 @@ const SummaryView = () => {
     return arr;
   };
 
-  /* Scroll collapsed header logic */
   useEffect(() => {
     const scroller = document.querySelector('.main-content') || window;
     let ticking = false;
@@ -586,9 +618,8 @@ const SummaryView = () => {
         if (!pageRef.current) return window.scrollY || 0;
         const rect = pageRef.current.getBoundingClientRect();
         return Math.max(0, -rect.top);
-      } else {
-        return scroller.scrollTop;
       }
+      return scroller.scrollTop;
     };
 
     const t = 100;
@@ -626,7 +657,6 @@ const SummaryView = () => {
     };
   }, [summary]);
 
-  /* ---------- Derived / memoized values (always defined) ---------- */
   const BRAND = 'ONJO REVIEW';
   const SITE_DEFAULT_OG = useMemo(() => {
     try {
@@ -650,75 +680,68 @@ const SummaryView = () => {
         return `${u.origin}${u.pathname}`;
       }
     } catch (e) {}
-    return `https://ogonjo.com/summary/${summary?.slug || summary?.id || ''}`;
+    return `https://onjoreviews.com/review/${summary?.slug || summary?.id || ''}`;
   }, [summary?.slug, summary?.id]);
 
   const ogImage = summary?.image_url || SITE_DEFAULT_OG;
 
-  // Extended JSON-LD: includes publisher, aggregateRating, breadcrumb
   const ldJson = useMemo(() => {
     const ratingValue = avgRating || summary?.avg_rating || undefined;
     const ratingCount = summary?.rating_count || undefined;
     const reviewCount = commentsCount || (summary?.comments_count || undefined);
 
     const base = {
-      "@context": "https://schema.org",
-      "@type": "Article",
-      "headline": summary?.title || BRAND,
-      "description": metaDescription,
-      "author": { "@type": "Person", "name": summary?.author || BRAND },
-      "datePublished": summary?.created_at || undefined,
-      "dateModified": summary?.updated_at || summary?.created_at || undefined,
-      "image": ogImage,
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": pageUrl
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: summary?.title || BRAND,
+      description: metaDescription,
+      author: { '@type': 'Person', name: summary?.author || BRAND },
+      datePublished: summary?.created_at || undefined,
+      dateModified: summary?.updated_at || summary?.created_at || undefined,
+      image: ogImage,
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': pageUrl,
       },
-      "publisher": {
-        "@type": "Organization",
-        "name": BRAND,
-        "logo": {
-          "@type": "ImageObject",
-          "url": SITE_DEFAULT_OG
-        }
-      }
+      publisher: {
+        '@type': 'Organization',
+        name: BRAND,
+        logo: {
+          '@type': 'ImageObject',
+          url: SITE_DEFAULT_OG,
+        },
+      },
     };
 
     if (ratingValue || ratingCount || reviewCount) {
       base.aggregateRating = {
-        "@type": "AggregateRating",
-        ...(ratingValue ? { "ratingValue": Number(ratingValue).toFixed(1) } : {}),
-        ...(ratingCount ? { "ratingCount": Number(ratingCount) } : {}),
-        ...(reviewCount ? { "reviewCount": Number(reviewCount) } : {})
+        '@type': 'AggregateRating',
+        ...(ratingValue ? { ratingValue: Number(ratingValue).toFixed(1) } : {}),
+        ...(ratingCount ? { ratingCount: Number(ratingCount) } : {}),
+        ...(reviewCount ? { reviewCount: Number(reviewCount) } : {}),
       };
     }
 
-    // BreadcrumbList
     try {
-      const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : '';
+      const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
       base.breadcrumb = {
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "Home", "item": `${origin || ''}/` },
-          { "@type": "ListItem", "position": 2, "name": "Summaries", "item": `${origin || ''}/explore` },
-          { "@type": "ListItem", "position": 3, "name": summary?.title || "Summary", "item": pageUrl }
-        ]
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${origin}/` },
+          { '@type': 'ListItem', position: 2, name: 'Reviews', item: `${origin}/explore` },
+          { '@type': 'ListItem', position: 3, name: summary?.title || 'Review', item: pageUrl },
+        ],
       };
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
 
     return base;
   }, [summary, metaDescription, ogImage, pageUrl, SITE_DEFAULT_OG, BRAND, avgRating, commentsCount]);
 
-  // Use the first tag for explore links (consistency with ExplorePage which expects `tag`)
   const viewAllLinkForTags = useMemo(() => {
-    const tagsArr = Array.isArray(summary?.tags) ? summary.tags.map(t => (t || '').trim()).filter(Boolean) : [];
+    const tagsArr = Array.isArray(summary?.tags) ? summary.tags.map((t) => (t || '').trim()).filter(Boolean) : [];
     if (tagsArr.length === 0) return `/explore`;
     return `/explore?tag=${encodeURIComponent(tagsArr[0])}`;
   }, [summary?.tags]);
-
-  /* ---------- Render ---------- */
 
   if (isLoading) {
     return (
@@ -736,15 +759,15 @@ const SummaryView = () => {
   const processedSummary = summary.summary ? DOMPurify.sanitize(summary.summary) : '';
   const youtubeId = extractYouTubeId(summary.youtube_url);
 
-  // Affiliate parsing (kept defensive)
   let affiliateUrl = null;
   let affiliateLabel = null;
   let affiliateType = null;
   const rawAffiliate = summary?.affiliate_link ?? null;
+
   if (rawAffiliate) {
     try {
       if (typeof rawAffiliate === 'string') {
-        const parts = rawAffiliate.split('|', 2).map(p => (p || '').trim());
+        const parts = rawAffiliate.split('|', 2).map((p) => (p || '').trim());
         if (parts.length === 2 && parts[1]) {
           affiliateType = (parts[0] || '').toLowerCase();
           affiliateUrl = parts[1];
@@ -779,25 +802,31 @@ const SummaryView = () => {
       'Get Book';
   }
 
-  const onClickTag = (tag) => { if (!tag) return; navigate(`/explore?tag=${encodeURIComponent(tag)}`); };
-
   const handleEditSaved = (updatedRow) => {
-    if (!updatedRow) { setShowEdit(false); return; }
+    if (!updatedRow) {
+      setShowEdit(false);
+      return;
+    }
     const normalized = normalizeRow(updatedRow);
-    setSummary(prev => prev ? { ...prev, ...normalized } : normalized);
-    backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags).catch(() => {});
-    try { window.dispatchEvent(new CustomEvent('summary:updated', { detail: { id: normalized.id } })); } catch (e) {}
+    setSummary((prev) => (prev ? { ...prev, ...normalized } : normalized));
+    backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags, false).catch(() => {});
+    try {
+      window.dispatchEvent(new CustomEvent('summary:updated', { detail: { id: normalized.id } }));
+    } catch (e) {}
     setShowEdit(false);
   };
 
   return (
-    <div className={`summary-page ${collapsed ? 'title-collapsed' : ''}`} ref={pageRef} data-collapsed={collapsed ? '1' : '0'}>
+    <div
+      className={`summary-page ${collapsed ? 'title-collapsed' : ''}`}
+      ref={pageRef}
+      data-collapsed={collapsed ? '1' : '0'}
+    >
       <Helmet>
         <title>{metaTitle}</title>
         <meta name="description" content={metaDescription} />
         <link rel="canonical" href={pageUrl} />
 
-        {/* Open Graph */}
         <meta property="og:site_name" content={BRAND} />
         <meta property="og:title" content={metaTitle} />
         <meta property="og:description" content={metaDescription} />
@@ -805,38 +834,46 @@ const SummaryView = () => {
         <meta property="og:url" content={pageUrl} />
         <meta property="og:image" content={ogImage} />
         {summary?.created_at && <meta property="article:published_time" content={summary.created_at} />}
-        {(summary?.updated_at || summary?.created_at) && <meta property="article:modified_time" content={summary?.updated_at || summary?.created_at} />}
+        {(summary?.updated_at || summary?.created_at) && (
+          <meta property="article:modified_time" content={summary?.updated_at || summary?.created_at} />
+        )}
         {summary?.author && <meta property="article:author" content={summary.author} />}
 
-        {/* article:tag — multiple meta tags for each tag */}
-        {Array.isArray(summary?.tags) && summary.tags.map((t) => (
-          <meta key={`og-tag-${t}`} property="article:tag" content={t} />
-        ))}
+        {Array.isArray(summary?.tags) &&
+          summary.tags.map((t) => <meta key={`og-tag-${t}`} property="article:tag" content={t} />)}
 
-        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={metaTitle} />
         <meta name="twitter:description" content={metaDescription} />
         <meta name="twitter:image" content={ogImage} />
 
         <meta name="robots" content="index, follow" />
-
-        {/* JSON-LD */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }} />
       </Helmet>
 
       <div className="summary-top-spacer" aria-hidden="true" />
-      <header className={`summary-header ${collapsed ? 'collapsed' : ''}`} ref={headerRef} role="banner" aria-expanded={!collapsed}>
+      <header
+        className={`summary-header ${collapsed ? 'collapsed' : ''}`}
+        ref={headerRef}
+        role="banner"
+        aria-expanded={!collapsed}
+      >
         <div className="summary-thumb-wrap" aria-hidden="true">
           {summary.image_url ? (
-            <img className={`summary-thumb ${collapsed ? 'collapsed' : ''}`} src={summary.image_url} alt={summary.title} />
+            <img
+              className={`summary-thumb ${collapsed ? 'collapsed' : ''}`}
+              src={summary.image_url}
+              alt={summary.title}
+            />
           ) : (
             <div className={`summary-thumb placeholder ${collapsed ? 'collapsed' : ''}`} />
           )}
         </div>
 
         <div className="summary-title-left">
-          <h1 className="summary-title" title={summary.title}>{summary.title}</h1>
+          <h1 className="summary-title" title={summary.title}>
+            {summary.title}
+          </h1>
           <div className="summary-author">by {summary.author}</div>
         </div>
 
@@ -852,16 +889,27 @@ const SummaryView = () => {
             </a>
           )}
           {ownerId && currentUserId && ownerId === currentUserId && (
-            <button className="hf-btn" type="button" onClick={() => setShowEdit(true)}>Edit</button>
+            <button className="hf-btn" type="button" onClick={() => setShowEdit(true)}>
+              Edit
+            </button>
           )}
         </div>
 
         <div className="summary-engagement" role="group" aria-label="Engagement">
-          <button className={`eng-btn like-btn ${userHasLiked ? 'liked' : ''}`} onClick={handleLike} aria-pressed={userHasLiked} title="Like">
+          <button
+            className={`eng-btn like-btn ${userHasLiked ? 'liked' : ''}`}
+            onClick={handleLike}
+            aria-pressed={userHasLiked}
+            title="Like"
+          >
             <FaHeart /> <span>{likes ?? 0}</span>
           </button>
-          <div className="eng-item" title="Comments"><FaComment /> <span>{commentsCount ?? 0}</span></div>
-          <div className="eng-item" title="Views"><FaEye /> <span>{views ?? 0}</span></div>
+          <div className="eng-item" title="Comments">
+            <FaComment /> <span>{commentsCount ?? 0}</span>
+          </div>
+          <div className="eng-item" title="Views">
+            <FaEye /> <span>{views ?? 0}</span>
+          </div>
           <div className="rating-block" title={`Average rating ${avgRating || 0}`}>
             <div className="rating-stars">{renderStars('md')}</div>
             <div className="avg-text">{avgRating ? Number(avgRating).toFixed(1) : '0.0'}</div>
@@ -869,10 +917,7 @@ const SummaryView = () => {
         </div>
       </header>
 
-     
       <div style={{ maxWidth: 980, margin: '10px auto', padding: '0 18px' }}>
-        
-
         {youtubeId && (
           <div className="youtube-embed" style={{ marginBottom: 12 }}>
             <div className="embed-inner">
@@ -887,22 +932,20 @@ const SummaryView = () => {
             </div>
           </div>
         )}
-        
       </div>
-         <article className="summary-body" dangerouslySetInnerHTML={{ __html: processedSummary }} />
+
+      <article className="summary-body" dangerouslySetInnerHTML={{ __html: processedSummary }} />
+
       {(isRecommending || (recommendedContent && recommendedContent.length > 0)) && (
         <HorizontalCarousel
-          title={`More like this`}
+          title="More like this"
           items={recommendedContent}
           loading={isRecommending}
           skeletonCount={4}
           viewAllLink={viewAllLinkForTags}
         >
-          {recommendedContent.map(item => (
-            <BookSummaryCard
-              key={String(item.id || item.slug)}
-              summary={item}
-            />
+          {recommendedContent.map((item) => (
+            <BookSummaryCard key={String(item.id || item.slug)} summary={item} />
           ))}
         </HorizontalCarousel>
       )}
@@ -915,10 +958,18 @@ const SummaryView = () => {
 
       {recError && (
         <div className="rec-error" style={{ padding: '12px 16px', color: '#b45309' }}>
-          {recError} <button onClick={() => {
-            if (Array.isArray(summary?.tags) && summary.tags.length > 0) fetchRecommendedByTags(summary.tags, 10, summary.id);
-            else if (summary.category) fetchRecommendedByCategory(summary.category, 10, summary.id);
-          }}>Retry</button>
+          {recError}{' '}
+          <button
+            onClick={() => {
+              if (Array.isArray(summary?.tags) && summary.tags.length > 0) {
+                fetchRecommendedByTags(summary.tags, 10, summary.id);
+              } else if (summary.category) {
+                fetchRecommendedByCategory(summary.category, 10, summary.id);
+              }
+            }}
+          >
+            Retry
+          </button>
         </div>
       )}
 
