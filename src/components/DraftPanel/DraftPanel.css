@@ -1,128 +1,145 @@
-/* src/components/DraftPanel/DraftPanel.css */
+/* ═══════════════════════════════════════════════════════════
+   DraftPanel.css — ONJO Reviews
+   Modal is 50 vh tall, centred with 25 vh above & below,
+   and scrolls inside. Table panel scrolls independently.
+═══════════════════════════════════════════════════════════ */
 
+/* ── Panel shell ─────────────────────────────────────────── */
 .draft-panel {
-  padding: 8px 0;
-  font-family: inherit;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 0 40px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: #111827;
 }
 
 .draft-panel__loading {
-  padding: 32px;
+  padding: 48px;
   text-align: center;
   color: #6b7280;
-  font-size: 14px;
+  font-size: 15px;
 }
 
+/* ── Header ──────────────────────────────────────────────── */
 .draft-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding: 0 2px;
+  margin-bottom: 18px;
 }
 
 .draft-panel__title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #111827;
   margin: 0;
+  font-size: 20px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .draft-panel__count {
-  background: #e5e7eb;
-  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 20px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
 }
 
+/* ── Banner ──────────────────────────────────────────────── */
 .draft-panel__banner {
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 14px;
   display: flex;
   align-items: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .draft-panel__banner--ok {
   background: #f0fdf4;
+  color: #166534;
   border: 1px solid #bbf7d0;
-  color: #16a34a;
 }
 
 .draft-panel__banner--warn {
   background: #fefce8;
+  color: #854d0e;
   border: 1px solid #fde68a;
-  color: #92400e;
 }
 
+/* ── Empty state ─────────────────────────────────────────── */
 .draft-panel__empty {
-  text-align: center;
-  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 24px;
   color: #6b7280;
+  text-align: center;
 }
 
 .draft-panel__empty-icon {
   font-size: 48px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
-.draft-panel__empty p {
-  font-size: 14px;
-  margin: 0;
-}
-
-/* Bulk toolbar */
+/* ── Bulk toolbar ────────────────────────────────────────── */
 .draft-panel__bulk {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  padding: 10px 14px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 14px;
 }
 
 .draft-panel__bulk-info {
   font-size: 13px;
   font-weight: 600;
   color: #374151;
-}
-
-.dp-bulk-divider {
-  color: #d1d5db;
-  font-size: 16px;
+  white-space: nowrap;
 }
 
 .draft-panel__bulk-mode {
   display: flex;
   align-items: center;
+  gap: 4px;
   font-size: 13px;
   color: #374151;
 }
 
 .draft-panel__bulk-cat {
-  padding: 5px 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
   border: 1px solid #d1d5db;
-  border-radius: 7px;
-  font-size: 12px;
-  color: #374151;
+  font-size: 13px;
   background: #fff;
   cursor: pointer;
 }
 
-/* Table */
+.dp-bulk-divider {
+  color: #d1d5db;
+  font-size: 18px;
+  line-height: 1;
+  user-select: none;
+}
+
+/* ── Table ───────────────────────────────────────────────── */
 .draft-panel__table-wrap {
   overflow-x: auto;
-  border-radius: 10px;
   border: 1px solid #e5e7eb;
+  border-radius: 10px;
 }
 
 .draft-panel__table {
@@ -131,22 +148,17 @@
   font-size: 13px;
 }
 
-.draft-panel__table thead tr {
+.draft-panel__table thead th {
   background: #f9fafb;
-}
-
-.draft-panel__table th {
   padding: 10px 12px;
   text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #6b7280;
+  font-weight: 600;
+  color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
 }
 
-.draft-panel__table td {
+.draft-panel__table tbody td {
   padding: 10px 12px;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: middle;
@@ -168,101 +180,465 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
-}
-
-.draft-panel__draft-badge {
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 9px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-  border: 1px solid #fde68a;
+  flex-wrap: wrap;
 }
 
 .draft-panel__title-text {
-  font-weight: 600;
-  color: #111827;
+  font-weight: 500;
+}
+
+.draft-panel__draft-badge {
+  display: inline-block;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  letter-spacing: 0.5px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 260px;
 }
 
 .draft-panel__cat-select {
-  padding: 4px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 12px;
-  color: #374151;
-  background: #fff;
   width: 100%;
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid #d1d5db;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
 }
 
-/* Buttons */
+/* ── Shared buttons ──────────────────────────────────────── */
 .dp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 6px 12px;
-  border-radius: 7px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #374151;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  border: none;
-  transition: all 0.15s;
   white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1.4;
 }
 
 .dp-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+}
+
+.dp-btn:not(:disabled):hover {
+  background: #f3f4f6;
 }
 
 .dp-btn--secondary {
   background: #f3f4f6;
+  border-color: #d1d5db;
   color: #374151;
-  border: 1px solid #d1d5db;
 }
-.dp-btn--secondary:hover:not(:disabled) { background: #e5e7eb; }
 
 .dp-btn--publish {
   background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
-  border: none;
+  font-weight: 600;
 }
-.dp-btn--publish:hover:not(:disabled) { background: #1d4ed8; }
+
+.dp-btn--publish:not(:disabled):hover {
+  background: #1d4ed8;
+}
 
 .dp-btn--edit {
   background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
+  border-color: #bbf7d0;
+  color: #166534;
 }
-.dp-btn--edit:hover:not(:disabled) { background: #dcfce7; }
+
+.dp-btn--autolink {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #3730a3;
+}
 
 .dp-btn--danger {
-  background: #fef2f2;
+  background: #fff5f5;
+  border-color: #fca5a5;
   color: #dc2626;
-  border: 1px solid #fecaca;
 }
-.dp-btn--danger:hover:not(:disabled) { background: #fee2e2; }
 
-/* Modal overlay (delete confirm) */
+/* ═══════════════════════════════════════════════════════════
+   MODAL OVERLAY + BOX
+   - Overlay covers viewport, centres the box
+   - Box is 50 vh tall, max 680px wide, 25 vh from top
+   - Uses flex-column so header/footer are sticky and
+     only the content area scrolls
+═══════════════════════════════════════════════════════════ */
+
 .draft-panel__modal-overlay {
   position: fixed;
+  --header-height: 56px; /* unify to 56px */
+  --category-height: 48px;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
   display: flex;
-  align-items: center;
+  align-items: center;        /* vertical centre → 25 vh above & below */
   justify-content: center;
-  z-index: 1200;
+  z-index: 1000;
+  padding: 5vh 16px;          /* keeps box off screen edges on small viewports */
+  box-sizing: border-box;
+  overflow-y: auto;           /* failsafe if viewport shrinks below modal height */
 }
 
+/* Default small modal (delete confirm) */
 .draft-panel__modal {
   background: #fff;
   border-radius: 14px;
-  padding: 32px 28px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  position: relative;
+}
+
+/* ── Auto-link modal — tall, scrollable ──────────────────── */
+.dp-autolink-modal {
+  max-width: 780px;
+  padding: 0;                       /* header/footer handle their own padding */
+  display: flex;
+  flex-direction: column;
+
+  /* Height: fill 90 vh minus the 5 vh top+bottom padding on the overlay.
+     Use min/max so it never crushes on short content or blows past viewport. */
+  height: clamp(420px, 80vh, 86vh);
+  max-height: 86vh;
+  overflow: hidden;                 /* children scroll, not the box itself */
+}
+
+/* ── Auto-link modal header (sticky top) ─────────────────── */
+.dp-autolink-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+/* ── Tab bar (sticky below header) ──────────────────────── */
+.dp-tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 10px 22px 0;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.dp-tab {
+  padding: 7px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.dp-tab--active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+  font-weight: 600;
+}
+
+.dp-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e5e7eb;
+  color: #374151;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+}
+
+.dp-tab-badge--active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* ── Tab description text ────────────────────────────────── */
+.dp-tab-desc {
+  font-size: 13px;
+  color: #6b7280;
+  padding: 12px 22px 0;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* ── Toolbar inside preview tab ──────────────────────────── */
+.dp-autolink-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 22px;
+  border-bottom: 1px solid #f3f4f6;
+  flex-shrink: 0;
+  background: #fafafa;
+}
+
+/* ── THE SCROLLABLE CONTENT AREA ─────────────────────────── */
+.dp-autolink-scroll {
+  flex: 1 1 0;          /* fill remaining height between toolbar and footer */
+  overflow-y: auto;     /* THIS is the scroll */
+  overflow-x: auto;
+  padding: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbar styling (Webkit) */
+.dp-autolink-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dp-autolink-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.dp-autolink-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.dp-autolink-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ── Footer (sticky bottom) ──────────────────────────────── */
+.dp-autolink-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 0 0 14px 14px;
+}
+
+/* ── Autolink section (per-draft group) ──────────────────── */
+.dp-autolink-section {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.dp-autolink-section:last-child {
+  border-bottom: none;
+}
+
+.dp-autolink-section__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px 6px;
+  background: #f8fafc;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* ── Autolink table ──────────────────────────────────────── */
+.dp-autolink-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.dp-autolink-table thead th {
+  background: #f9fafb;
+  padding: 8px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.dp-autolink-table tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.dp-autolink-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dp-autolink-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+/* ── Frequency badges ────────────────────────────────────── */
+.dp-freq-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+}
+
+.dp-freq-badge--linked {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.dp-freq-badge--hot {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.dp-freq-badge--warm {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dp-freq-badge--cold {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* ── Empty state inside modal ────────────────────────────── */
+.dp-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* ── Scan / progress view ────────────────────────────────── */
+.dp-scan-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 24px;
+  flex: 1;
+  text-align: center;
+}
+
+.dp-scan-phrase {
+  font-size: 13px;
+  color: #6b7280;
+  min-height: 20px;
+  margin: 0 0 10px;
+  max-width: 460px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dp-scan-counter {
+  font-size: 14px;
+  color: #374151;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dp-scan-counter__current {
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.dp-scan-eta {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-left: 8px;
+}
+
+.dp-progress-track {
+  width: 100%;
+  max-width: 380px;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dp-progress-fill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+/* ── Spinner ─────────────────────────────────────────────── */
+.dp-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: dp-spin 0.75s linear infinite;
+}
+
+@keyframes dp-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive tweaks ───────────────────────────────────── */
+@media (max-width: 640px) {
+  .dp-autolink-modal {
+    height: 92vh;
+    max-height: 92vh;
+    border-radius: 10px;
+  }
+
+  .draft-panel__modal-overlay {
+    padding: 4vh 8px;
+    align-items: flex-end;   /* sheet slides up from bottom on mobile */
+  }
+
+  .dp-autolink-modal {
+    border-radius: 14px 14px 10px 10px;
+  }
+
+  .dp-autolink-table {
+    font-size: 11.5px;
+  }
+
+  .dp-autolink-header,
+  .dp-autolink-footer,
+  .dp-tab-desc,
+  .dp-autolink-toolbar {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .dp-tab-bar {
+    padding-left: 14px;
+  }
 }

@@ -63,15 +63,6 @@ const lcsr = (a = '', b = '') => {
 const combinedScore = (cand = '', q = '') =>
   Math.min(1, 0.55 * wordMatchScore(cand, q) + 0.35 * lcsr(cand, q) + 0.10 * (normalize(cand).startsWith(normalize(q)) ? 1 : 0));
 
-const pluralVariants = (word = '') => {
-  const w = normalize(word); if (!w) return [w];
-  const v = new Set([w]);
-  if (!w.endsWith('s'))  v.add(`${w}s`);
-  if (!w.endsWith('es')) v.add(`${w}es`);
-  if (w.endsWith('s'))   v.add(w.replace(/s+$/, ''));
-  return Array.from(v);
-};
-
 const parseAffiliateValue = (raw) => {
   if (!raw) return { type: 'buy', url: '' };
   try {
@@ -283,39 +274,28 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
     let cancelled = false;
     if (!linkSearch?.trim()) { setLinkResults([]); return; }
     (async () => {
-      const { data, error } = await supabase.from('book_summaries').select('id, title, slug').ilike('title', `%${linkSearch}%`).limit(10);
+      const { data, error } = await supabase
+        .from('book_summaries')
+        .select('id, title, slug')
+        .ilike('title', `%${linkSearch}%`)
+        .limit(10);
       if (!cancelled) setLinkResults(error ? [] : (data||[]));
     })();
     return () => { cancelled = true; };
   }, [linkSearch]);
 
   /* ── DB helpers ──────────────────────────────────────── */
+  // NOTE: selects only columns that exist in the ONJO Reviews schema (no 'keywords' column)
   const fetchTitleCandidates = async (text, limit = 200) => {
     const q = String(text||'').trim(); if (!q) return [];
-    try { const { data, error } = await supabase.from('book_summaries').select('id, title, slug, keywords').ilike('title', `%${q}%`).limit(limit); return error ? [] : (data||[]); } catch { return []; }
-  };
-  const fetchKeywordRows = async (limit = 800) => {
-    try { const { data, error } = await supabase.from('book_summaries').select('id, title, slug, keywords').not('keywords', 'is', null).limit(limit); return error ? [] : (data||[]); } catch { return []; }
-  };
-  const searchBestMatch = async (text, opts = {}) => {
-    const q = String(text||'').trim(); if (!q) return null;
-    const minScore = opts.minScore ?? 0.5;
-    try { const { data: ex } = await supabase.from('book_summaries').select('id, title, slug').ilike('title', q).maybeSingle(); if (ex?.id) return ex; } catch (_) {}
-    try { const { data: ph } = await supabase.from('book_summaries').select('id, title, slug').ilike('title', `%${q}%`).limit(1).maybeSingle(); if (ph?.id) return ph; } catch (_) {}
-    const tokens = uniqueWords(q).slice(0, 6); if (!tokens.length) return null;
-    const orFilters = tokens.map(t => `title.ilike.%${t}%`).join(',');
     try {
-      const { data: cands = [] } = await supabase.from('book_summaries').select('id, title, slug').or(orFilters).limit(40);
-      if (!cands?.length) return null;
-      const qVariants = q.split(/\s+/).length === 1 ? pluralVariants(q) : [normalize(q)];
-      let best = null, bestScore = 0;
-      cands.forEach(c => {
-        const score = combinedScore(c.title||'', q);
-        if (q.split(/\s+/).length === 1 && !qVariants.some(v => uniqueWords(c.title||'').includes(v))) return;
-        if (score > bestScore) { bestScore = score; best = c; }
-      });
-      return (best && bestScore >= minScore) ? best : null;
-    } catch { return null; }
+      const { data, error } = await supabase
+        .from('book_summaries')
+        .select('id, title, slug')
+        .ilike('title', `%${q}%`)
+        .limit(limit);
+      return error ? [] : (data||[]);
+    } catch { return []; }
   };
 
   const wrapNodeInAnchor = (node, row) => {
@@ -360,7 +340,22 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
       if (!phrases.length) { alert('No bolded phrases found.'); return; }
       const mapping = {};
       for (const phrase of phrases) {
-        try { mapping[phrase] = await searchBestMatch(phrase, { minScore: 0.5 }); } catch { mapping[phrase] = null; }
+        try {
+          const candidates = await fetchTitleCandidates(phrase, 40);
+          if (!candidates.length) { mapping[phrase] = null; continue; }
+          const nPhrase = normalize(phrase);
+          // Tier 1 — exact
+          let match = candidates.find(c => normalize(c.title) === nPhrase) ?? null;
+          // Tier 2 — containment
+          if (!match) match = candidates.find(c => { const nt = normalize(c.title); return nt.includes(nPhrase) || nPhrase.includes(nt); }) ?? null;
+          // Tier 3 — fuzzy ≥ 0.5
+          if (!match) {
+            let best = null, bestScore = 0;
+            for (const c of candidates) { const score = combinedScore(c.title||'', phrase); if (score > bestScore) { bestScore = score; best = c; } }
+            if (best && bestScore >= 0.5) match = best;
+          }
+          mapping[phrase] = match;
+        } catch { mapping[phrase] = null; }
       }
       let linkedCount = 0;
       boldNodes.forEach(node => { const text = (node.textContent||'').trim(); const match = mapping[text]; if (match?.id) { if (wrapNodeInAnchor(node, match)) linkedCount++; } });
@@ -386,6 +381,7 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
     alert(`Linked to /review/${generatedSlug}`);
   };
 
+  /* ── FIXED: Exact auto-link ──────────────────────────── */
   const autoLinkBoldExact = async () => {
     const editor = quillRef.current?.getEditor();
     if (!editor) { alert('Editor not ready'); return; }
@@ -393,18 +389,52 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
       const container = document.createElement('div');
       container.innerHTML = editor.root.innerHTML;
       const boldNodes = Array.from(container.querySelectorAll('strong, b'));
-      const phrases = Array.from(new Set(boldNodes.map(n => (n.textContent||'').trim()).filter(s => s.length >= 2))).slice(0, 200);
+      const phrases = Array.from(
+        new Set(boldNodes.map(n => (n.textContent || '').trim()).filter(s => s.length >= 2))
+      ).slice(0, 200);
       if (!phrases.length) { alert('No bolded phrases found.'); return; }
+
       let linkedCount = 0;
+
       for (const phrase of phrases) {
         try {
-          const variants = pluralVariants(phrase);
-          let matched = null;
-          for (const c of await fetchTitleCandidates(phrase, 200)) { if (!c?.title) continue; const nt = normalize(c.title); if (nt === normalize(phrase) || variants.includes(nt)) { matched = c; break; } }
+          const nPhrase = normalize(phrase);
+          // fetchTitleCandidates uses ilike '%phrase%' — already finds anything
+          // containing the phrase, so candidates will include exact matches too
+          const candidates = await fetchTitleCandidates(phrase, 200);
+          if (!candidates.length) continue;
+
+          // Tier 1 — normalized title is exactly the phrase
+          let matched = candidates.find(c => normalize(c.title) === nPhrase) ?? null;
+
+          // Tier 2 — title contains phrase OR phrase contains title (handles
+          // "KitchenAid Stand Mixer" matching "KitchenAid Stand Mixer Pro 5Qt")
+          if (!matched) {
+            matched = candidates.find(c => {
+              const nt = normalize(c.title);
+              return nt.includes(nPhrase) || nPhrase.includes(nt);
+            }) ?? null;
+          }
+
+          // Tier 3 — high-confidence fuzzy (≥ 0.85) for near-identical titles
+          if (!matched) {
+            let best = null, bestScore = 0;
+            for (const c of candidates) {
+              const score = combinedScore(c.title ?? '', phrase);
+              if (score > bestScore) { bestScore = score; best = c; }
+            }
+            if (best && bestScore >= 0.85) matched = best;
+          }
+
           if (!matched?.id) continue;
-          boldNodes.forEach(node => { if (normalize((node.textContent||'').trim()) !== normalize(phrase)) return; if (wrapNodeInAnchor(node, matched)) linkedCount++; });
+
+          boldNodes.forEach(node => {
+            if (normalize((node.textContent ?? '').trim()) !== nPhrase) return;
+            if (wrapNodeInAnchor(node, matched)) linkedCount++;
+          });
         } catch (_) {}
       }
+
       const newDelta = editor.clipboard.convert(container.innerHTML);
       editor.setContents(newDelta, 'user');
       setSummaryText(editor.root.innerHTML);
@@ -421,29 +451,20 @@ const EditSummaryForm = ({ summary = {}, onClose = () => {}, onUpdate = () => {}
       const boldNodes = Array.from(container.querySelectorAll('strong, b'));
       const phrases = Array.from(new Set(boldNodes.map(n => (n.textContent||'').trim()).filter(s => s.length >= 2))).slice(0, 200);
       if (!phrases.length) { alert('No bolded phrases found.'); return; }
-      let kwSample = [];
-      try { kwSample = await fetchKeywordRows(800); } catch (_) {}
       let linkedCount = 0;
       for (const phrase of phrases) {
         try {
-          const normalizedTokens = uniqueWords(phrase).map(t => normalize(t));
-          const titleCands = await fetchTitleCandidates(phrase, 200);
-          const kwCands = kwSample.filter(r => { try { if (!r?.keywords) return false; const kws = r.keywords.map(k => normalize(String(k||''))); return normalizedTokens.some(t => kws.includes(t) || kws.some(k => k.includes(t))); } catch { return false; } });
-          const byId = new Map();
-          titleCands.forEach(c => { if (c?.id) byId.set(c.id, c); });
-          kwCands.forEach(c => { if (c?.id && !byId.has(c.id)) byId.set(c.id, c); });
-          const merged = Array.from(byId.values()); if (!merged.length) continue;
+          const candidates = await fetchTitleCandidates(phrase, 200);
+          if (!candidates.length) continue;
+          const nPhrase = normalize(phrase);
           let best = null, bestScore = 0;
-          for (const c of merged) {
-            try {
-              let score = combinedScore(c.title||'', phrase);
-              if (normalize(c.title) === normalize(phrase)) score = Math.max(score, 0.95);
-              if (Array.isArray(c.keywords)) { const kws = c.keywords.map(k => normalize(String(k||''))); const matches = normalizedTokens.filter(t => kws.some(k => k === t || k.includes(t))).length; if (matches > 0) score = Math.min(1, score + 0.12 * matches); }
-              if (score > bestScore) { bestScore = score; best = c; }
-            } catch (_) {}
+          for (const c of candidates) {
+            let score = combinedScore(c.title||'', phrase);
+            if (normalize(c.title) === nPhrase) score = Math.max(score, 0.95);
+            if (score > bestScore) { bestScore = score; best = c; }
           }
           if (!best?.id || bestScore < 0.65) continue;
-          boldNodes.forEach(node => { if (normalize((node.textContent||'').trim()) !== normalize(phrase)) return; if (wrapNodeInAnchor(node, best)) linkedCount++; });
+          boldNodes.forEach(node => { if (normalize((node.textContent||'').trim()) !== nPhrase) return; if (wrapNodeInAnchor(node, best)) linkedCount++; });
         } catch (_) {}
       }
       const newDelta = editor.clipboard.convert(container.innerHTML);
