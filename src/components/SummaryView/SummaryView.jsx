@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/supabaseClient';
-import { FaHeart, FaStar, FaComment, FaEye, FaPlus, FaMinus, FaPaintBrush, FaShareAlt, FaArrowLeft } from 'react-icons/fa';
+import { FaHeart, FaStar, FaComment, FaEye } from 'react-icons/fa';
 import CommentsSection from '../CommentsSection/CommentsSection';
 import HorizontalCarousel from '../HorizontalCarousel/HorizontalCarousel';
 import BookSummaryCard from '../BookSummaryCard/BookSummaryCard';
@@ -54,7 +54,6 @@ const normalizeRow = (r = {}) => {
     comments_count: toNum(r.comments_count),
     avg_rating: Number(r.avg_rating ?? 0),
     rating_count: Number(ratingCountRaw),
-    difficulty_level: r.difficulty_level ?? null,
     created_at: r.created_at ?? null,
     updated_at: r.updated_at ?? null,
   };
@@ -112,62 +111,53 @@ const buildLightItem = (nr = {}, src = {}) => {
     tags: nr.tags || [],
     user_id: nr.user_id ?? null,
     created_at: nr.created_at ?? null,
-    difficulty_level: nr.difficulty_level ?? null,
   };
 };
 
-/* ---------- Inline loader (three bouncing dots) ---------- */
-const InlineLoader = ({ label = 'Loading content' }) => (
-  <div
-    className="summary-inline-loader"
-    aria-live="polite"
-    aria-busy="true"
-    role="status"
-    style={{ textAlign: 'center', padding: 20 }}
-  >
-    <div
-      className="dots"
-      aria-hidden="true"
-      style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}
-    >
-      <span className="dot" />
-      <span className="dot" />
-      <span className="dot" />
-    </div>
-    <div style={{ marginTop: 8, color: '#6b7280' }}>{label}…</div>
-    <style>{`
-      .summary-inline-loader .dot {
-        width: 10px; height: 10px; border-radius: 50%; background: #2563eb;
-        display: inline-block; transform: translateY(0);
-        animation: summary-dot 1s infinite ease-in-out;
-      }
-      .summary-inline-loader .dot:nth-child(2) { animation-delay: 0.12s; }
-      .summary-inline-loader .dot:nth-child(3) { animation-delay: 0.24s; }
-      @keyframes summary-dot {
-        0%   { transform: translateY(0);   opacity: 0.4; }
-        40%  { transform: translateY(-8px); opacity: 1;   }
-        80%  { transform: translateY(0);   opacity: 0.6; }
-        100% { transform: translateY(0);   opacity: 0.4; }
-      }
-    `}</style>
-  </div>
-);
+/* ---------- Theme tokens ---------- */
+const THEMES = {
+  white: {
+    bg: '#ffffff',
+    articleBg: '#ffffff',
+    text: '#1a1209',
+    muted: '#6b5f4a',
+    accent: '#8b5e3c',
+    border: '#e8ddd0',
+    headerBg: 'rgba(255,255,255,0.97)',
+    shadow: '0 8px 32px rgba(139,94,60,0.08)',
+    engBg: '#fdf8f4',
+    tagBg: '#f5ede3',
+    tagColor: '#7a4f2d',
+  },
+  brown: {
+    bg: '#2c1f14',
+    articleBg: '#1e1510',
+    text: '#f0e6d6',
+    muted: '#b5997c',
+    accent: '#d4956a',
+    border: '#4a3320',
+    headerBg: 'rgba(44,31,20,0.97)',
+    shadow: '0 8px 32px rgba(0,0,0,0.4)',
+    engBg: '#261a10',
+    tagBg: '#3d2910',
+    tagColor: '#d4956a',
+  },
+};
 
 /* ---------- Component ---------- */
 const SummaryView = () => {
   const { param } = useParams();
   const navigate = useNavigate();
 
-  /* ---------- Reading UX state ---------- */
-  const [fontSize, setFontSize] = useState(18);
-  const [lineHeight, setLineHeight] = useState(1.75);
-  const [readingMode, setReadingMode] = useState(true);
+  /* ── NEW: theme + font size state ── */
+  const [theme, setTheme] = useState('white');   // 'white' | 'brown'
+  const [fontSize, setFontSize] = useState(18);  // px
 
-  /* ---------- Data state ---------- */
+  const T = THEMES[theme];
+
   const [summary, setSummary] = useState(null);
   const [postId, setPostId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [processedSummaryHtml, setProcessedSummaryHtml] = useState('');
 
   const [likes, setLikes] = useState(0);
   const [userHasLiked, setUserHasLiked] = useState(false);
@@ -189,9 +179,7 @@ const SummaryView = () => {
 
   const pageRef = useRef(null);
   const headerRef = useRef(null);
-  const slugCache = useRef(new Map());
 
-  /* ---------- Auth ---------- */
   useEffect(() => {
     (async () => {
       try {
@@ -203,43 +191,30 @@ const SummaryView = () => {
     })();
   }, []);
 
-  /* ---------- Robust scroll-to-top ---------- */
-  const scrollToTop = useCallback((behavior = 'auto') => {
-    try {
-      const mainEl = document.querySelector('.main-content');
-      const scrollEl =
-        mainEl && typeof mainEl.scrollTo === 'function'
-          ? mainEl
-          : pageRef.current && typeof pageRef.current.scrollTo === 'function'
-          ? pageRef.current
-          : document.scrollingElement || document.documentElement || document.body;
-
-      if (window && window.location && window.location.hash) {
-        const urlNoHash = window.location.pathname + window.location.search;
-        try { window.history.replaceState(null, '', urlNoHash); } catch (e) {}
-      }
-
-      if (scrollEl && typeof scrollEl.scrollTo === 'function') {
-        try { scrollEl.scrollTo({ top: 0, left: 0, behavior }); } catch (e) { scrollEl.scrollTop = 0; }
-      } else if (typeof window.scrollTo === 'function') {
-        try { window.scrollTo({ top: 0, left: 0, behavior }); } catch (e) { window.scrollTo(0, 0); }
-      } else {
-        if (document && document.documentElement) document.documentElement.scrollTop = 0;
-        if (document && document.body) document.body.scrollTop = 0;
-      }
-    } catch (e) {
-      try { window.scrollTo(0, 0); } catch (ee) {}
-    }
-  }, []);
-
   useEffect(() => {
-    scrollToTop('auto');
-    requestAnimationFrame(() => scrollToTop('smooth'));
-    const t = setTimeout(() => scrollToTop('auto'), 120);
-    return () => clearTimeout(t);
-  }, [param, scrollToTop]);
+    try {
+      const scrollToTop = () => {
+        try {
+          const main = document.querySelector('.main-content');
+          if (main && typeof main.scrollTo === 'function') {
+            main.scrollTo({ top: 0, behavior: 'auto' });
+            return;
+          }
+          if (pageRef.current && typeof pageRef.current.scrollTo === 'function') {
+            pageRef.current.scrollTo({ top: 0, behavior: 'auto' });
+            return;
+          }
+          if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+            window.scrollTo(0, 0);
+            if (document?.documentElement) document.documentElement.scrollTop = 0;
+            if (document?.body) document.body.scrollTop = 0;
+          }
+        } catch (e) {}
+      };
+      scrollToTop();
+    } catch (e) {}
+  }, [param]);
 
-  /* ---------- Recommendation helpers ---------- */
   const fetchRecommendedByTags = useCallback(async (tags = [], limit = 10, resolvedPostId = null) => {
     setIsRecommending(true);
     setRecError(null);
@@ -269,25 +244,19 @@ const SummaryView = () => {
       const rows = (data || [])
         .map((d) => buildLightItem(normalizeRow(d), d))
         .filter((r) => {
-          const postTags = Array.isArray(r.tags)
-            ? r.tags.map((t) => (t || '').toLowerCase().trim())
-            : [];
+          const postTags = Array.isArray(r.tags) ? r.tags.map((t) => (t || '').toLowerCase().trim()) : [];
           return postTags.some((t) => lowerTags.includes(t));
         })
         .map((r) => {
-          const postTags = Array.isArray(r.tags)
-            ? r.tags.map((t) => (t || '').toLowerCase().trim())
-            : [];
+          const postTags = Array.isArray(r.tags) ? r.tags.map((t) => (t || '').toLowerCase().trim()) : [];
           const matchCount = postTags.filter((t) => lowerTags.includes(t)).length;
           return { r, matchCount };
         });
 
       rows.sort((a, b) => {
         if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
-        if ((b.r.views_count || 0) !== (a.r.views_count || 0))
-          return (b.r.views_count || 0) - (a.r.views_count || 0);
-        if ((b.r.likes_count || 0) !== (a.r.likes_count || 0))
-          return (b.r.likes_count || 0) - (a.r.likes_count || 0);
+        if ((b.r.views_count || 0) !== (a.r.views_count || 0)) return (b.r.views_count || 0) - (a.r.views_count || 0);
+        if ((b.r.likes_count || 0) !== (a.r.likes_count || 0)) return (b.r.likes_count || 0) - (a.r.likes_count || 0);
         const tb = b.r.created_at ? new Date(b.r.created_at).getTime() : 0;
         const ta = a.r.created_at ? new Date(a.r.created_at).getTime() : 0;
         return tb - ta;
@@ -359,7 +328,6 @@ const SummaryView = () => {
     }
   }, []);
 
-  /* ---------- Original view-tracking logic (unchanged) ---------- */
   const recordView = useCallback(async (resolvedPostId) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -385,7 +353,6 @@ const SummaryView = () => {
     }
   }, []);
 
-  /* ---------- Data loading ---------- */
   useEffect(() => {
     let mounted = true;
 
@@ -399,8 +366,7 @@ const SummaryView = () => {
           .from('book_summaries')
           .select(
             `id, slug, title, author, description, category, image_url,
-             affiliate_link, youtube_url, tags, difficulty_level, user_id,
-             views_count, created_at`
+             affiliate_link, youtube_url, tags, user_id, views_count, created_at`
           )
           .eq('slug', param)
           .maybeSingle();
@@ -415,8 +381,7 @@ const SummaryView = () => {
             .from('book_summaries')
             .select(
               `id, slug, title, author, description, category, image_url,
-               affiliate_link, youtube_url, tags, difficulty_level, user_id,
-               views_count, created_at`
+               affiliate_link, youtube_url, tags, user_id, views_count, created_at`
             )
             .eq('id', param)
             .maybeSingle();
@@ -438,8 +403,7 @@ const SummaryView = () => {
         }
 
         const normalized = normalizeRow(data);
-        normalized.category =
-          normalized?.category == null ? '' : String(normalized.category).trim();
+        normalized.category = normalized?.category == null ? '' : String(normalized.category).trim();
 
         setSummary(normalized);
         setPostId(normalized.id);
@@ -451,12 +415,9 @@ const SummaryView = () => {
 
         setIsLoading(false);
 
-        backgroundFetchFollowups(
-          normalized.id,
-          normalized.category,
-          normalized.tags,
-          true
-        ).catch((e) => console.debug(e));
+        backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags, true).catch((e) =>
+          console.debug(e)
+        );
       } catch (err) {
         console.error('Error loading minimal summary:', err);
         if (mounted) {
@@ -471,13 +432,7 @@ const SummaryView = () => {
     return () => { mounted = false; };
   }, [param, navigate]);
 
-  /* ---------- Background followups (original logic, unchanged) ---------- */
-  const backgroundFetchFollowups = async (
-    resolvedPostId,
-    category = '',
-    tags = [],
-    shouldIncrementView = true
-  ) => {
+  const backgroundFetchFollowups = async (resolvedPostId, category = '', tags = [], shouldIncrementView = true) => {
     try {
       const { data, error } = await supabase
         .from('book_summaries')
@@ -487,8 +442,7 @@ const SummaryView = () => {
 
       if (!error && data) {
         const formatted = normalizeRow(data);
-        formatted.category =
-          formatted?.category == null ? '' : String(formatted.category).trim();
+        formatted.category = formatted?.category == null ? '' : String(formatted.category).trim();
         setSummary((prev) => (prev ? { ...prev, ...formatted } : formatted));
         setOwnerId(formatted.user_id ?? null);
         setLikes(formatted.likes_count || 0);
@@ -497,17 +451,9 @@ const SummaryView = () => {
       }
 
       try {
-        const { data: ratingData } = await supabase.rpc('get_average_rating', {
-          p_post_id: resolvedPostId,
-        });
-        if (
-          Array.isArray(ratingData) &&
-          ratingData[0] &&
-          ratingData[0].average_rating !== null
-        ) {
-          setAvgRating(
-            Math.round(Number(ratingData[0].average_rating) * 10) / 10
-          );
+        const { data: ratingData } = await supabase.rpc('get_average_rating', { p_post_id: resolvedPostId });
+        if (Array.isArray(ratingData) && ratingData[0] && ratingData[0].average_rating !== null) {
+          setAvgRating(Math.round(Number(ratingData[0].average_rating) * 10) / 10);
         }
       } catch (e) {}
 
@@ -515,21 +461,11 @@ const SummaryView = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const [likesRes, ratingRes] = await Promise.all([
-            supabase
-              .from('likes')
-              .select('id')
-              .eq('post_id', resolvedPostId)
-              .eq('user_id', user.id),
-            supabase
-              .from('ratings')
-              .select('rating')
-              .eq('post_id', resolvedPostId)
-              .eq('user_id', user.id)
-              .maybeSingle(),
+            supabase.from('likes').select('id').eq('post_id', resolvedPostId).eq('user_id', user.id),
+            supabase.from('ratings').select('rating').eq('post_id', resolvedPostId).eq('user_id', user.id).maybeSingle(),
           ]);
           if (likesRes?.data && likesRes.data.length) setUserHasLiked(true);
-          if (ratingRes?.data && ratingRes.data.rating)
-            setUserRating(ratingRes.data.rating);
+          if (ratingRes?.data && ratingRes.data.rating) setUserRating(ratingRes.data.rating);
         }
       } catch (e) {}
 
@@ -550,126 +486,6 @@ const SummaryView = () => {
     }
   };
 
-  /* ---------- Internal link resolution ---------- */
-  const resolveInternalLinksInHtml = useCallback(async (html) => {
-    if (!html) return '';
-    const sanitized = DOMPurify.sanitize(html, { ADD_ATTR: ['data-summary-id'] });
-    const container = document.createElement('div');
-    container.innerHTML = sanitized;
-
-    const anchors = Array.from(container.querySelectorAll('a[data-summary-id]'));
-    const fallbackAnchors =
-      anchors.length === 0
-        ? Array.from(container.querySelectorAll('a[href*="#summary-"]'))
-        : [];
-
-    const targets = new Map();
-
-    anchors.forEach((a) => {
-      const id = String(a.getAttribute('data-summary-id') || '').trim();
-      if (id) {
-        if (!targets.has(id)) targets.set(id, []);
-        targets.get(id).push(a);
-      }
-    });
-
-    fallbackAnchors.forEach((a) => {
-      const href = a.getAttribute('href') || '';
-      const m = href.match(/#summary-([0-9a-fA-F-]+)/);
-      if (m && m[1]) {
-        const key = String(m[1]);
-        a.setAttribute('data-summary-id', key);
-        if (!targets.has(key)) targets.set(key, []);
-        targets.get(key).push(a);
-      }
-    });
-
-    if (targets.size === 0) return container.innerHTML;
-
-    const idsToFetch = Array.from(targets.keys()).filter(
-      (id) => !slugCache.current.has(id)
-    );
-    let fetched = [];
-    if (idsToFetch.length > 0) {
-      try {
-        const { data, error } = await supabase
-          .from('book_summaries')
-          .select('id, slug')
-          .in('id', idsToFetch);
-        if (!error && Array.isArray(data)) fetched = data;
-      } catch (e) {
-        console.error('Error fetching slugs for internal links', e);
-      }
-
-      (fetched || []).forEach((r) => {
-        try { slugCache.current.set(String(r.id), r.slug || null); } catch (e) {}
-      });
-      idsToFetch.forEach((id) => {
-        if (!slugCache.current.has(id)) slugCache.current.set(id, null);
-      });
-    }
-
-    targets.forEach((anchorNodes, id) => {
-      const slug = slugCache.current.get(id) || null;
-      anchorNodes.forEach((a) => {
-        if (slug) {
-          a.setAttribute('href', `/summary/${slug}`);
-          a.setAttribute('data-summary-slug', slug);
-          a.classList.add('internal-summary-link');
-        } else {
-          a.removeAttribute('href');
-          a.classList.add('internal-summary-link-broken');
-          a.setAttribute('aria-disabled', 'true');
-          a.title = a.title || 'Linked content not found';
-        }
-      });
-    });
-
-    return container.innerHTML;
-  }, []);
-
-  /* Process HTML whenever summary body changes */
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      if (!summary?.summary) { setProcessedSummaryHtml(''); return; }
-      try {
-        const resolved = await resolveInternalLinksInHtml(summary.summary);
-        if (!cancelled) setProcessedSummaryHtml(resolved);
-      } catch (e) {
-        console.error('Could not process content HTML', e);
-        if (!cancelled)
-          setProcessedSummaryHtml(DOMPurify.sanitize(summary.summary));
-      }
-    };
-    run();
-    return () => { cancelled = true; };
-  }, [summary?.summary, resolveInternalLinksInHtml]);
-
-  /* ---------- Intercept article link clicks for SPA navigation ---------- */
-  const onArticleClick = (e) => {
-    const a = e.target && e.target.closest && e.target.closest('a');
-    if (!a) return;
-    const href = a.getAttribute('href') || '';
-    const dataSlug = a.getAttribute('data-summary-slug');
-    const isExternal = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(href);
-    if (isExternal) return;
-    const isInternal = dataSlug || href.startsWith('/summary/');
-    if (!isInternal) return;
-    e.preventDefault();
-    const slug =
-      dataSlug ||
-      href.replace(/^\/summary\//, '').split(/[/?#]/)[0] ||
-      null;
-    if (slug) {
-      navigate(`/summary/${slug}`);
-      setTimeout(() => scrollToTop('auto'), 10);
-      requestAnimationFrame(() => scrollToTop('smooth'));
-      setTimeout(() => scrollToTop('auto'), 150);
-    }
-  };
-
-  /* ---------- Like / Rating handlers (original, unchanged) ---------- */
   const handleLike = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -677,18 +493,12 @@ const SummaryView = () => {
       if (!postId) { alert('Post not ready. Please try again.'); return; }
 
       if (userHasLiked) {
-        const { error } = await supabase
-          .from('likes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+        const { error } = await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
         if (error) throw error;
         setUserHasLiked(false);
         setLikes((l) => Math.max(0, l - 1));
       } else {
-        const { error } = await supabase
-          .from('likes')
-          .insert([{ post_id: postId, user_id: user.id }]);
+        const { error } = await supabase.from('likes').insert([{ post_id: postId, user_id: user.id }]);
         if (error) throw error;
         setUserHasLiked(true);
         setLikes((l) => (Number(l) || 0) + 1);
@@ -712,24 +522,12 @@ const SummaryView = () => {
         p_rating: value,
       });
 
-      if (error) {
-        console.error('rate_post rpc error', error);
-        alert('Could not save rating. Try again later.');
-        return false;
-      }
+      if (error) { console.error('rate_post rpc error', error); alert('Could not save rating. Try again later.'); return false; }
 
       try {
-        const { data: ratingData } = await supabase.rpc('get_average_rating', {
-          p_post_id: postId,
-        });
-        if (
-          Array.isArray(ratingData) &&
-          ratingData[0] &&
-          ratingData[0].average_rating !== null
-        ) {
-          setAvgRating(
-            Math.round(Number(ratingData[0].average_rating) * 10) / 10
-          );
+        const { data: ratingData } = await supabase.rpc('get_average_rating', { p_post_id: postId });
+        if (Array.isArray(ratingData) && ratingData[0] && ratingData[0].average_rating !== null) {
+          setAvgRating(Math.round(Number(ratingData[0].average_rating) * 10) / 10);
         }
       } catch (e) {}
 
@@ -774,7 +572,6 @@ const SummaryView = () => {
     return arr;
   };
 
-  /* ---------- Scroll-collapse header ---------- */
   useEffect(() => {
     const scroller = document.querySelector('.main-content') || window;
     let ticking = false;
@@ -823,54 +620,6 @@ const SummaryView = () => {
     };
   }, [summary]);
 
-  /* ---------- Reading UX handlers ---------- */
-  const increaseFont   = () => setFontSize((s) => Math.min(28, s + 2));
-  const decreaseFont   = () => setFontSize((s) => Math.max(12, s - 2));
-  const toggleReadingMode = () => setReadingMode((r) => !r);
-  const resetTypography   = () => {
-    setFontSize(18);
-    setLineHeight(1.75);
-    setReadingMode(true);
-  };
-
-  const handleBackToArticle = () => {
-    if (window.history.length > 1) navigate(-1);
-    else navigate('/explore');
-  };
-
-  const handleShare = async () => {
-    if (!summary) return;
-    const title = summary.title || 'Check this out on ONJO REVIEW';
-    const description = makeSafeDescription(
-      summary.description || summary.summary || '',
-      140
-    );
-    const shareText = `${title}\n\n${description}\n\nRead more on ONJO REVIEW:\n${pageUrl}`;
-
-    if (navigator.share) {
-      try { await navigator.share({ title, text: description, url: pageUrl }); return; } catch (e) {}
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      try {
-        await navigator.clipboard.writeText(shareText);
-        alert('Link + description copied to clipboard!');
-        return;
-      } catch (e) {}
-    }
-    try { window.prompt('Copy the text below to share:', shareText); } catch (e) {
-      alert('Unable to copy automatically. Please copy the URL: ' + pageUrl);
-    }
-  };
-
-  /* ---------- Difficulty badge ---------- */
-  const renderDifficultyBadge = (lvl) => {
-    if (!lvl) return null;
-    const text = String(lvl);
-    const cls = `difficulty-label difficulty-${text.toLowerCase().replace(/\s+/g, '-')}`;
-    return <span className={cls}>{text}</span>;
-  };
-
-  /* ---------- Meta ---------- */
   const BRAND = 'ONJO REVIEW';
   const SITE_DEFAULT_OG = useMemo(() => {
     try {
@@ -880,10 +629,7 @@ const SummaryView = () => {
     return 'https://your-ogonjo-app.netlify.app/ogonjo.jpg';
   }, []);
 
-  const metaTitle = useMemo(
-    () => `${summary?.title || 'Loading…'} – ${BRAND}`,
-    [summary?.title]
-  );
+  const metaTitle = useMemo(() => `${summary?.title || 'Loading…'} – ${BRAND}`, [summary?.title]);
   const metaDescription = useMemo(
     () => makeSafeDescription(summary?.description || summary?.summary || '', 160),
     [summary?.description, summary?.summary]
@@ -934,13 +680,11 @@ const SummaryView = () => {
 
     try {
       const origin =
-        typeof window !== 'undefined' && window.location.origin
-          ? window.location.origin
-          : '';
+        typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
       base.breadcrumb = {
         '@type': 'BreadcrumbList',
         itemListElement: [
-          { '@type': 'ListItem', position: 1, name: 'Home',    item: `${origin}/` },
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${origin}/` },
           { '@type': 'ListItem', position: 2, name: 'Reviews', item: `${origin}/explore` },
           { '@type': 'ListItem', position: 3, name: summary?.title || 'Review', item: pageUrl },
         ],
@@ -958,504 +702,540 @@ const SummaryView = () => {
     return `/explore?tag=${encodeURIComponent(tagsArr[0])}`;
   }, [summary?.tags]);
 
-  /* ---------- Edit saved ---------- */
-  const handleEditSaved = (updatedRow) => {
-    if (!updatedRow) { setShowEdit(false); return; }
-    const normalized = normalizeRow(updatedRow);
-    setSummary((prev) => (prev ? { ...prev, ...normalized } : normalized));
-    backgroundFetchFollowups(
-      normalized.id,
-      normalized.category,
-      normalized.tags,
-      false
-    ).catch(() => {});
-    try {
-      window.dispatchEvent(
-        new CustomEvent('summary:updated', { detail: { id: normalized.id } })
-      );
-    } catch (e) {}
-    setShowEdit(false);
-  };
-
-  /* ---------- Article style (reading UX) ---------- */
-  const articleStyle = {
-    fontFamily: '"Times New Roman", Times, serif',
-    fontSize: `${fontSize}px`,
-    lineHeight: lineHeight,
-    maxWidth: 780,
-    margin: '20px auto',
-    background: readingMode ? '#ffffff' : '#f7f7f8',
-    padding: readingMode ? '28px 32px' : '20px 24px',
-    borderRadius: 10,
-    boxShadow: readingMode ? '0 6px 20px rgba(0,0,0,0.05)' : 'none',
-    color: '#0b1220',
-    wordBreak: 'break-word',
-    minHeight: 180,
-  };
-
-  /* ---------- Affiliate link parsing (kept from original) ---------- */
-  let affiliateUrl   = null;
-  let affiliateLabel = null;
-  let affiliateType  = null;
-
-  if (!isLoading && summary) {
-    const rawAffiliate = summary?.affiliate_link ?? null;
-    if (rawAffiliate) {
-      try {
-        if (typeof rawAffiliate === 'string') {
-          const parts = rawAffiliate.split('|', 2).map((p) => (p || '').trim());
-          if (parts.length === 2 && parts[1]) {
-            affiliateType = (parts[0] || '').toLowerCase();
-            affiliateUrl  = parts[1];
-          } else {
-            affiliateType = 'book';
-            affiliateUrl  = rawAffiliate.trim();
-          }
-        } else if (typeof rawAffiliate === 'object' && rawAffiliate !== null) {
-          if (rawAffiliate.url) {
-            affiliateUrl  = String(rawAffiliate.url);
-            affiliateType = (rawAffiliate.type || 'book').toLowerCase();
-          } else if (rawAffiliate.link) {
-            affiliateUrl  = String(rawAffiliate.link);
-            affiliateType = (rawAffiliate.type || 'book').toLowerCase();
-          }
-        }
-      } catch (e) {
-        try { affiliateUrl = String(rawAffiliate); affiliateType = 'book'; }
-        catch (ee) { affiliateUrl = null; affiliateType = null; }
-      }
-    }
-    if (affiliateUrl) {
-      affiliateLabel =
-        affiliateType === 'pdf' ? 'Get PDF' :
-        affiliateType === 'app' ? 'Open App' :
-        'Get Book';
-    }
-  }
-
-  /* ---------- Derived flags ---------- */
-  const showLoading  = Boolean(isLoading);
-  const showNotFound = !isLoading && !summary;
-  const headerTitle  = summary?.title  || (showLoading ? 'Loading…' : 'Content Under Development');
-  const headerAuthor = summary?.author || '';
-  const headerImage  = summary?.image_url || null;
-  const youtubeId    = extractYouTubeId(summary?.youtube_url);
-
-  /* ======================================================================== */
-  /*  RENDER                                                                   */
-  /* ======================================================================== */
-
   if (isLoading) {
     return (
-      <div className="centered-loader-viewport" role="status" aria-live="polite">
-        <div className="centered-loader">
-          <div className="spinner" />
-          <div className="loader-text">Loading…</div>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#fdf8f4',
+          fontFamily: '"Times New Roman", Times, serif',
+        }}
+        role="status"
+        aria-live="polite"
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              border: '3px solid #e8ddd0',
+              borderTop: '3px solid #8b5e3c',
+              borderRadius: '50%',
+              animation: 'onjo-spin 0.9s linear infinite',
+              margin: '0 auto 16px',
+            }}
+          />
+          <div style={{ color: '#8b5e3c', fontSize: 15, letterSpacing: '0.08em' }}>Loading…</div>
         </div>
+        <style>{`@keyframes onjo-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
+  if (!summary) return (
+    <div style={{ padding: 28, fontFamily: '"Times New Roman", Times, serif', color: '#6b5f4a' }}>
+      Summary not found.
+    </div>
+  );
+
+  const processedSummary = summary.summary ? DOMPurify.sanitize(summary.summary) : '';
+  const youtubeId = extractYouTubeId(summary.youtube_url);
+
+  let affiliateUrl = null;
+  let affiliateLabel = null;
+  let affiliateType = null;
+  const rawAffiliate = summary?.affiliate_link ?? null;
+
+  if (rawAffiliate) {
+    try {
+      if (typeof rawAffiliate === 'string') {
+        const parts = rawAffiliate.split('|', 2).map((p) => (p || '').trim());
+        if (parts.length === 2 && parts[1]) {
+          affiliateType = (parts[0] || '').toLowerCase();
+          affiliateUrl = parts[1];
+        } else {
+          affiliateType = 'book';
+          affiliateUrl = rawAffiliate.trim();
+        }
+      } else if (typeof rawAffiliate === 'object' && rawAffiliate !== null) {
+        if (rawAffiliate.url) {
+          affiliateUrl = String(rawAffiliate.url);
+          affiliateType = (rawAffiliate.type || 'book').toLowerCase();
+        } else if (rawAffiliate.link) {
+          affiliateUrl = String(rawAffiliate.link);
+          affiliateType = (rawAffiliate.type || 'book').toLowerCase();
+        }
+      }
+    } catch (e) {
+      try { affiliateUrl = String(rawAffiliate); affiliateType = 'book'; } catch (ee) { affiliateUrl = null; affiliateType = null; }
+    }
+  }
+
+  if (affiliateUrl) {
+    affiliateLabel =
+      affiliateType === 'pdf' ? 'Get PDF' :
+      affiliateType === 'app' ? 'Open App' :
+      'Get Book';
+  }
+
+  const handleEditSaved = (updatedRow) => {
+    if (!updatedRow) { setShowEdit(false); return; }
+    const normalized = normalizeRow(updatedRow);
+    setSummary((prev) => (prev ? { ...prev, ...normalized } : normalized));
+    backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags, false).catch(() => {});
+    try { window.dispatchEvent(new CustomEvent('summary:updated', { detail: { id: normalized.id } })); } catch (e) {}
+    setShowEdit(false);
+  };
+
+  /* ── Inline styles (theme-driven) ── */
+  const pageStyle = {
+    background: T.bg,
+    color: T.text,
+    minHeight: '100vh',
+    transition: 'background 0.35s, color 0.35s',
+  };
+
+  const articleBodyStyle = {
+    fontFamily: '"Times New Roman", Times, serif',
+    fontSize: `${fontSize}px`,
+    lineHeight: 1.85,
+    textAlign: 'justify',
+    hyphens: 'auto',
+    WebkitHyphens: 'auto',
+    color: T.text,
+    background: T.articleBg,
+    maxWidth: 780,
+    margin: '0 auto',
+    padding: '36px 40px',
+    borderRadius: 4,
+    boxShadow: T.shadow,
+    wordBreak: 'break-word',
+    transition: 'background 0.35s, color 0.35s, box-shadow 0.35s',
+  };
+
   return (
-    <div
-      className={`summary-page ${collapsed ? 'title-collapsed' : ''}`}
-      ref={pageRef}
-      data-collapsed={collapsed ? '1' : '0'}
-      style={{ background: '#fff', color: '#0b1220' }}
-    >
-      <Helmet>
-        <title>{metaTitle}</title>
-        <meta name="description" content={metaDescription} />
-        <link rel="canonical" href={pageUrl} />
-        <meta property="og:site_name"   content={BRAND} />
-        <meta property="og:title"       content={metaTitle} />
-        <meta property="og:description" content={metaDescription} />
-        <meta property="og:type"        content="article" />
-        <meta property="og:url"         content={pageUrl} />
-        <meta property="og:image"       content={ogImage} />
-        {summary?.created_at && (
-          <meta property="article:published_time" content={summary.created_at} />
-        )}
-        {(summary?.updated_at || summary?.created_at) && (
-          <meta
-            property="article:modified_time"
-            content={summary?.updated_at || summary?.created_at}
-          />
-        )}
-        {summary?.author && (
-          <meta property="article:author" content={summary.author} />
-        )}
-        {Array.isArray(summary?.tags) &&
-          summary.tags.map((t) => (
-            <meta key={`og-tag-${t}`} property="article:tag" content={t} />
-          ))}
-        <meta name="twitter:card"        content="summary_large_image" />
-        <meta name="twitter:title"       content={metaTitle} />
-        <meta name="twitter:description" content={metaDescription} />
-        <meta name="twitter:image"       content={ogImage} />
-        <meta name="robots" content="index, follow" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }}
-        />
-      </Helmet>
+    <>
+      {/* ── Global article typography overrides ── */}
+      <style>{`
+        .onjo-article-body p {
+          margin: 0 0 1.4em 0;
+          text-align: justify;
+          hyphens: auto;
+          -webkit-hyphens: auto;
+        }
+        .onjo-article-body h1,
+        .onjo-article-body h2,
+        .onjo-article-body h3,
+        .onjo-article-body h4 {
+          font-family: "Times New Roman", Times, serif;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+          margin: 1.8em 0 0.6em;
+          line-height: 1.3;
+          color: ${T.text};
+        }
+        .onjo-article-body h2 {
+          font-size: 1.45em;
+          border-bottom: 1px solid ${T.border};
+          padding-bottom: 0.3em;
+        }
+        .onjo-article-body h3 { font-size: 1.2em; }
+        .onjo-article-body blockquote {
+          border-left: 4px solid ${T.accent};
+          margin: 1.6em 0;
+          padding: 0.8em 1.4em;
+          background: ${T.tagBg};
+          border-radius: 0 4px 4px 0;
+          font-style: italic;
+          color: ${T.muted};
+        }
+        .onjo-article-body ul,
+        .onjo-article-body ol {
+          padding-left: 1.6em;
+          margin: 0 0 1.4em;
+        }
+        .onjo-article-body li { margin-bottom: 0.5em; }
+        .onjo-article-body a {
+          color: ${T.accent};
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+        .onjo-article-body a:hover { opacity: 0.75; }
+        .onjo-article-body img {
+          max-width: 100%;
+          border-radius: 6px;
+          margin: 1.2em 0;
+          display: block;
+        }
+        .onjo-article-body strong { color: ${T.text}; }
+        .onjo-article-body em { font-style: italic; }
+        .onjo-article-body hr {
+          border: none;
+          border-top: 1px solid ${T.border};
+          margin: 2em 0;
+        }
 
-      <div className="summary-top-spacer" aria-hidden="true" />
+        /* Theme-toggle button */
+        .onjo-theme-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px;
+          border-radius: 20px;
+          border: 1.5px solid ${T.border};
+          background: ${T.engBg};
+          color: ${T.muted};
+          font-size: 13px;
+          font-family: "Times New Roman", Times, serif;
+          cursor: pointer;
+          transition: all 0.2s;
+          white-space: nowrap;
+        }
+        .onjo-theme-btn:hover { border-color: ${T.accent}; color: ${T.accent}; }
 
-      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
-      <header
-        className={`summary-header ${collapsed ? 'collapsed' : ''}`}
-        ref={headerRef}
-        role="banner"
-        aria-expanded={!collapsed}
-        style={{ background: '#fff' }}
-      >
-        <div className="summary-thumb-wrap" aria-hidden="true">
-          {headerImage ? (
-            <img
-              className={`summary-thumb ${collapsed ? 'collapsed' : ''}`}
-              src={headerImage}
-              alt={headerTitle}
-            />
-          ) : (
-            <div
-              className={`summary-thumb placeholder ${collapsed ? 'collapsed' : ''}`}
-            />
+        /* Font-size controls */
+        .onjo-font-ctrl {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .onjo-font-ctrl button {
+          width: 28px; height: 28px;
+          border-radius: 50%;
+          border: 1.5px solid ${T.border};
+          background: ${T.engBg};
+          color: ${T.muted};
+          font-size: 14px;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.2s;
+        }
+        .onjo-font-ctrl button:hover { border-color: ${T.accent}; color: ${T.accent}; }
+        .onjo-font-ctrl span {
+          font-size: 12px;
+          color: ${T.muted};
+          min-width: 36px;
+          text-align: center;
+          font-family: "Times New Roman", Times, serif;
+        }
+
+        /* Reading toolbar */
+        .onjo-reading-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 12px;
+          max-width: 820px;
+          margin: 12px auto 0;
+          padding: 0 20px;
+          flex-wrap: wrap;
+        }
+
+        /* Tags */
+        .onjo-tag {
+          display: inline-block;
+          padding: 3px 10px;
+          border-radius: 12px;
+          background: ${T.tagBg};
+          color: ${T.tagColor};
+          font-size: 12px;
+          font-family: "Times New Roman", Times, serif;
+          letter-spacing: 0.03em;
+          margin: 2px 3px 2px 0;
+          text-transform: capitalize;
+        }
+
+        /* Engagement bar */
+        .onjo-eng-bar {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+          padding: 10px 16px;
+          background: ${T.engBg};
+          border-top: 1px solid ${T.border};
+          border-bottom: 1px solid ${T.border};
+          transition: background 0.35s;
+        }
+
+        /* Decorative drop-cap for first paragraph */
+        .onjo-article-body > div:first-child > p:first-child::first-letter,
+        .onjo-article-body > p:first-child::first-letter {
+          float: left;
+          font-size: 3.6em;
+          line-height: 0.78;
+          font-weight: 700;
+          color: ${T.accent};
+          font-family: "Times New Roman", Times, serif;
+          margin: 0.06em 0.1em 0 0;
+          padding: 0;
+        }
+
+        @keyframes onjo-spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+          .onjo-article-body-wrap { padding: 0 4px !important; }
+        }
+      `}</style>
+
+      <div className={`summary-page ${collapsed ? 'title-collapsed' : ''}`} ref={pageRef} data-collapsed={collapsed ? '1' : '0'} style={pageStyle}>
+        <Helmet>
+          <title>{metaTitle}</title>
+          <meta name="description" content={metaDescription} />
+          <link rel="canonical" href={pageUrl} />
+          <meta property="og:site_name" content={BRAND} />
+          <meta property="og:title" content={metaTitle} />
+          <meta property="og:description" content={metaDescription} />
+          <meta property="og:type" content="article" />
+          <meta property="og:url" content={pageUrl} />
+          <meta property="og:image" content={ogImage} />
+          {summary?.created_at && <meta property="article:published_time" content={summary.created_at} />}
+          {(summary?.updated_at || summary?.created_at) && (
+            <meta property="article:modified_time" content={summary?.updated_at || summary?.created_at} />
           )}
-        </div>
+          {summary?.author && <meta property="article:author" content={summary.author} />}
+          {Array.isArray(summary?.tags) &&
+            summary.tags.map((t) => <meta key={`og-tag-${t}`} property="article:tag" content={t} />)}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={metaTitle} />
+          <meta name="twitter:description" content={metaDescription} />
+          <meta name="twitter:image" content={ogImage} />
+          <meta name="robots" content="index, follow" />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ldJson) }} />
+        </Helmet>
 
-        <div className="summary-title-left">
-          <h1
-            className="summary-title"
-            title={headerTitle}
-            style={{ fontFamily: '"Times New Roman", Times, serif' }}
-          >
-            {headerTitle}
-          </h1>
-          <div className="summary-meta-row">
-            <div className="summary-author" title={headerAuthor || ''}>
-              <span className="author-prefix">by&nbsp;</span>
-              <span className="author-name">{headerAuthor}</span>
-            </div>
-            <div className="summary-difficulty-inline">
-              {renderDifficultyBadge(summary?.difficulty_level)}
-            </div>
-          </div>
-        </div>
+        <div className="summary-top-spacer" aria-hidden="true" />
 
-        <div className="summary-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {affiliateUrl && affiliateLabel && (
-            <a
-              className={`affiliate-btn ${affiliateType ? `affiliate-${affiliateType}` : ''}`}
-              href={affiliateUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {affiliateLabel}
-            </a>
-          )}
-
-          <button
-            className="hf-btn share-btn"
-            type="button"
-            onClick={handleShare}
-            title="Share"
-            aria-label="Share this content"
-          >
-            <FaShareAlt />
-          </button>
-
-          {ownerId && currentUserId && ownerId === currentUserId && (
-            <button
-              className="hf-btn"
-              type="button"
-              onClick={() => setShowEdit(true)}
-            >
-              Edit
-            </button>
-          )}
-        </div>
-
-        <div className="summary-engagement" role="group" aria-label="Engagement">
-          <button
-            className={`eng-btn like-btn ${userHasLiked ? 'liked' : ''}`}
-            onClick={handleLike}
-            aria-pressed={userHasLiked}
-            title="Like"
-          >
-            <FaHeart /> <span>{likes ?? 0}</span>
-          </button>
-          <div className="eng-item" title="Comments">
-            <FaComment /> <span>{commentsCount ?? 0}</span>
-          </div>
-          <div className="eng-item" title="Views">
-            <FaEye /> <span>{views ?? 0}</span>
-          </div>
-          <div className="rating-block" title={`Average rating ${avgRating || 0}`}>
-            <div className="rating-stars">{renderStars('md')}</div>
-            <div className="avg-text">
-              {avgRating ? Number(avgRating).toFixed(1) : '0.0'}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ── READER CONTROLS TOOLBAR ────────────────────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          margin: '10px auto 8px',
-          maxWidth: 980,
-          padding: '0 18px',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            className="hf-btn"
-            aria-label="Decrease font size"
-            onClick={decreaseFont}
-          >
-            <FaMinus />
-          </button>
-          <div style={{ minWidth: 44, textAlign: 'center', fontSize: 13, color: '#6b7280' }}>
-            {fontSize}px
-          </div>
-          <button
-            className="hf-btn"
-            aria-label="Increase font size"
-            onClick={increaseFont}
-          >
-            <FaPlus />
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            className="hf-btn"
-            title="Toggle reading mode"
-            onClick={toggleReadingMode}
-          >
-            <FaPaintBrush />
-          </button>
-          <button
-            className="hf-btn"
-            title="Reset typography"
-            onClick={resetTypography}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-
-      {/* ── YOUTUBE EMBED ──────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 980, margin: '10px auto', padding: '0 18px' }}>
-        {youtubeId && (
-          <div className="youtube-embed" style={{ marginBottom: 12 }}>
-            <div className="embed-inner">
-              <iframe
-                className="youtube-iframe"
-                title="YouTube clip"
-                src={`https://www.youtube-nocookie.com/embed/${youtubeId}`}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── ARTICLE BODY ───────────────────────────────────────────────────── */}
-      <main style={{ maxWidth: 980, margin: '0 auto', padding: '0 18px' }}>
-        {showNotFound ? (
-          /* "Content Under Development" empty state */
-          <div
-            style={{
-              ...articleStyle,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#6b7280',
-              textAlign: 'center',
-              padding: '40px 32px',
-            }}
-          >
-            <div style={{ fontSize: 42, marginBottom: 16, opacity: 0.7 }}>📖</div>
-            <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 10, color: '#0b1220' }}>
-              Content Under Development
-            </div>
-            <div
-              style={{
-                fontSize: 15,
-                lineHeight: 1.6,
-                color: '#4b5563',
-                marginBottom: 6,
-                maxWidth: 480,
-              }}
-            >
-              This resource is being carefully curated to ensure the highest
-              quality insights.
-            </div>
-            <div
-              style={{
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: '#6b7280',
-                marginBottom: 16,
-                maxWidth: 460,
-              }}
-            >
-              We prioritise depth and accuracy over speed.
-            </div>
-            <button
-              onClick={handleBackToArticle}
-              className="hf-btn"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '12px 24px',
-                fontSize: 15,
-                fontWeight: 500,
-                backgroundColor: '#2563eb',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: '0 2px 4px rgba(37,99,235,0.2)',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#1d4ed8';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = '#2563eb';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <FaArrowLeft /> Back to Article
-            </button>
-            <div
-              style={{
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: '#22c55e',
-                fontWeight: 700,
-                marginTop: 20,
-                maxWidth: 460,
-              }}
-            >
-              Explore related content below while we expand our library.
-            </div>
-          </div>
-        ) : (
-          /* Normal article render — simple dangerouslySetInnerHTML, no ad slots */
-          <article
-            className="summary-body"
-            style={articleStyle}
-            onClick={onArticleClick}
-            dangerouslySetInnerHTML={{ __html: processedSummaryHtml }}
-          />
-        )}
-
-        {/*
-          Link styles injected here so they follow the article wherever it lives.
-          .internal-summary-link  → known SPA links
-          .internal-summary-link-broken → broken/missing links
-          Generic <a> inside .summary-body → bold + underline, subtle blue
-        */}
-        <style>{`
-          .summary-body a {
-            color: #1d4ed8;
-            font-weight: 600;
-            text-decoration: underline;
-            text-underline-offset: 3px;
-            transition: color 0.15s;
-          }
-          .summary-body a:hover,
-          .summary-body a:focus {
-            color: #1e40af;
-            text-decoration-thickness: 2px;
-          }
-          .summary-body a.internal-summary-link {
-            color: #2563eb;
-            font-weight: 700;
-          }
-          .summary-body a.internal-summary-link-broken {
-            color: #9ca3af;
-            cursor: not-allowed;
-            text-decoration: line-through;
-            pointer-events: none;
-          }
-        `}</style>
-      </main>
-
-      {/* ── RECOMMENDATIONS ────────────────────────────────────────────────── */}
-      {(isRecommending || (recommendedContent && recommendedContent.length > 0)) && (
-        <HorizontalCarousel
-          title="More like this"
-          items={recommendedContent}
-          loading={isRecommending}
-          skeletonCount={4}
-          viewAllLink={viewAllLinkForTags}
+        {/* ── HEADER ── */}
+        <header
+          className={`summary-header ${collapsed ? 'collapsed' : ''}`}
+          ref={headerRef}
+          role="banner"
+          aria-expanded={!collapsed}
+          style={{ background: T.headerBg, borderBottom: `1px solid ${T.border}` }}
         >
-          {recommendedContent.map((item) => (
-            <BookSummaryCard key={String(item.id || item.slug)} summary={item} />
-          ))}
-        </HorizontalCarousel>
-      )}
+          <div className="summary-thumb-wrap" aria-hidden="true">
+            {summary.image_url ? (
+              <img
+                className={`summary-thumb ${collapsed ? 'collapsed' : ''}`}
+                src={summary.image_url}
+                alt={summary.title}
+                style={{ borderRadius: 4, boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}
+              />
+            ) : (
+              <div
+                className={`summary-thumb placeholder ${collapsed ? 'collapsed' : ''}`}
+                style={{ background: T.tagBg }}
+              />
+            )}
+          </div>
 
-      {!isRecommending &&
-        recommendedContent &&
-        recommendedContent.length === 0 &&
-        !recError && (
-          <div className="rec-empty" style={{ padding: '12px 16px', color: '#6b7280' }}>
+          <div className="summary-title-left">
+            <h1
+              className="summary-title"
+              title={summary.title}
+              style={{
+                fontFamily: '"Times New Roman", Times, serif',
+                color: T.text,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {summary.title}
+            </h1>
+            <div
+              className="summary-author"
+              style={{ fontFamily: '"Times New Roman", Times, serif', color: T.muted, fontStyle: 'italic' }}
+            >
+              by {summary.author}
+            </div>
+
+            {/* Tags row */}
+            {Array.isArray(summary.tags) && summary.tags.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                {summary.tags.slice(0, 5).map((tag) => (
+                  <span key={tag} className="onjo-tag">{tag}</span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="summary-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {affiliateUrl && affiliateLabel && (
+              <a
+                className={`affiliate-btn ${affiliateType ? `affiliate-${affiliateType}` : ''}`}
+                href={affiliateUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  background: T.accent,
+                  color: '#fff',
+                  borderRadius: 4,
+                  padding: '7px 16px',
+                  fontFamily: '"Times New Roman", Times, serif',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  textDecoration: 'none',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {affiliateLabel}
+              </a>
+            )}
+            {ownerId && currentUserId && ownerId === currentUserId && (
+              <button
+                className="hf-btn"
+                type="button"
+                onClick={() => setShowEdit(true)}
+                style={{ fontFamily: '"Times New Roman", Times, serif' }}
+              >
+                Edit
+              </button>
+            )}
+          </div>
+
+          {/* ── ENGAGEMENT ROW ── */}
+          <div className="onjo-eng-bar" role="group" aria-label="Engagement">
+            <button
+              className={`eng-btn like-btn ${userHasLiked ? 'liked' : ''}`}
+              onClick={handleLike}
+              aria-pressed={userHasLiked}
+              title="Like"
+              style={{ color: userHasLiked ? '#c0392b' : T.muted }}
+            >
+              <FaHeart /> <span>{likes ?? 0}</span>
+            </button>
+            <div className="eng-item" title="Comments" style={{ color: T.muted }}>
+              <FaComment /> <span>{commentsCount ?? 0}</span>
+            </div>
+            <div className="eng-item" title="Views" style={{ color: T.muted }}>
+              <FaEye /> <span>{views ?? 0}</span>
+            </div>
+            <div className="rating-block" title={`Average rating ${avgRating || 0}`}>
+              <div className="rating-stars">{renderStars('md')}</div>
+              <div className="avg-text" style={{ color: T.accent, fontFamily: '"Times New Roman", Times, serif', fontWeight: 700 }}>
+                {avgRating ? Number(avgRating).toFixed(1) : '0.0'}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* ── READING TOOLBAR ── */}
+        <div className="onjo-reading-toolbar">
+          {/* Theme toggle */}
+          <button
+            className="onjo-theme-btn"
+            onClick={() => setTheme((t) => (t === 'white' ? 'brown' : 'white'))}
+            aria-label="Toggle reading theme"
+          >
+            {theme === 'white' ? '☾ Night' : '☀ Day'}
+          </button>
+
+          {/* Font size */}
+          <div className="onjo-font-ctrl">
+            <button
+              onClick={() => setFontSize((s) => Math.max(13, s - 1))}
+              aria-label="Decrease font size"
+              title="Smaller text"
+            >
+              A−
+            </button>
+            <span>{fontSize}px</span>
+            <button
+              onClick={() => setFontSize((s) => Math.min(28, s + 1))}
+              aria-label="Increase font size"
+              title="Larger text"
+            >
+              A+
+            </button>
+          </div>
+        </div>
+
+        {/* ── YOUTUBE EMBED ── */}
+        {youtubeId && (
+          <div style={{ maxWidth: 820, margin: '16px auto', padding: '0 20px' }}>
+            <div className="youtube-embed" style={{ marginBottom: 12 }}>
+              <div className="embed-inner">
+                <iframe
+                  className="youtube-iframe"
+                  title="YouTube clip"
+                  src={`https://www.youtube-nocookie.com/embed/${youtubeId}`}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── ARTICLE BODY ── */}
+        <div className="onjo-article-body-wrap" style={{ maxWidth: 820, margin: '20px auto 32px', padding: '0 20px' }}>
+          <article
+            className="summary-body onjo-article-body"
+            style={articleBodyStyle}
+            dangerouslySetInnerHTML={{ __html: processedSummary }}
+          />
+        </div>
+
+        {/* ── RECOMMENDATIONS ── */}
+        {(isRecommending || (recommendedContent && recommendedContent.length > 0)) && (
+          <HorizontalCarousel
+            title="More like this"
+            items={recommendedContent}
+            loading={isRecommending}
+            skeletonCount={4}
+            viewAllLink={viewAllLinkForTags}
+          >
+            {recommendedContent.map((item) => (
+              <BookSummaryCard key={String(item.id || item.slug)} summary={item} />
+            ))}
+          </HorizontalCarousel>
+        )}
+
+        {!isRecommending && recommendedContent && recommendedContent.length === 0 && !recError && (
+          <div className="rec-empty" style={{ padding: '12px 16px', color: T.muted, fontFamily: '"Times New Roman", Times, serif' }}>
             No similar items found.
           </div>
         )}
 
-      {recError && (
-        <div className="rec-error" style={{ padding: '12px 16px', color: '#b45309' }}>
-          {recError}{' '}
-          <button
-            onClick={() => {
-              if (Array.isArray(summary?.tags) && summary.tags.length > 0) {
-                fetchRecommendedByTags(summary.tags, 10, summary.id);
-              } else if (summary?.category) {
-                fetchRecommendedByCategory(summary.category, 10, summary.id);
-              }
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* ── COMMENTS ───────────────────────────────────────────────────────── */}
-      <section className="summary-comments">
-        <h3>Comments</h3>
-        {summary?.id ? (
-          <CommentsSection postId={summary.id} />
-        ) : (
-          <div style={{ color: '#6b7280' }}>
-            Comments will appear once the content loads.
+        {recError && (
+          <div className="rec-error" style={{ padding: '12px 16px', color: '#b45309' }}>
+            {recError}{' '}
+            <button
+              onClick={() => {
+                if (Array.isArray(summary?.tags) && summary.tags.length > 0) {
+                  fetchRecommendedByTags(summary.tags, 10, summary.id);
+                } else if (summary.category) {
+                  fetchRecommendedByCategory(summary.category, 10, summary.id);
+                }
+              }}
+            >
+              Retry
+            </button>
           </div>
         )}
-      </section>
 
-      {/* ── EDIT FORM ──────────────────────────────────────────────────────── */}
-      {showEdit && (
-        <EditSummaryForm
-          summary={summary}
-          onClose={() => setShowEdit(false)}
-          onUpdate={(updatedRow) => handleEditSaved(updatedRow)}
-        />
-      )}
-    </div>
+        {/* ── COMMENTS ── */}
+        <section className="summary-comments" style={{ maxWidth: 820, margin: '0 auto', padding: '0 20px 40px' }}>
+          <h3 style={{ fontFamily: '"Times New Roman", Times, serif', color: T.text, borderBottom: `1px solid ${T.border}`, paddingBottom: 8, marginBottom: 20 }}>
+            Comments
+          </h3>
+          <CommentsSection postId={summary.id} />
+        </section>
+
+        {showEdit && (
+          <EditSummaryForm
+            summary={summary}
+            onClose={() => setShowEdit(false)}
+            onUpdate={(updatedRow) => handleEditSaved(updatedRow)}
+          />
+        )}
+      </div>
+    </>
   );
 };
 
