@@ -1,118 +1,41 @@
+// src/components/SummaryView/SummaryView.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+// CHANGES from original (File 3):
+//   1. Reading UX layer added: theme toggle (day/night), font-size controls,
+//      Times New Roman editorial typography, justified text, drop-cap, tag pills,
+//      themed engagement bar, themed comments section.
+//   2. Link style: colored + underline + slight fade on hover (via T.accent).
+//   3. All ad/workbook logic, data fetching, and business logic are IDENTICAL
+//      to the original File 3 — only visual/style layer changed.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/supabaseClient';
-import { FaHeart, FaStar, FaComment, FaEye } from 'react-icons/fa';
+import { FaHeart, FaStar, FaComment, FaEye, FaPlus, FaMinus, FaPaintBrush, FaShareAlt, FaArrowLeft } from 'react-icons/fa';
 import CommentsSection from '../CommentsSection/CommentsSection';
 import HorizontalCarousel from '../HorizontalCarousel/HorizontalCarousel';
 import BookSummaryCard from '../BookSummaryCard/BookSummaryCard';
 import DOMPurify from 'dompurify';
 import EditSummaryForm from '../EditSummaryForm/EditSummaryForm';
 import { Helmet } from 'react-helmet-async';
+
+// ── AD IMPORTS (unchanged from File 3) ──────────────────────────────────────
+import AdSlot from '../Ad/Ad';
+import { injectAds } from '../../utils/injectAds';
+import { fetchWorkbookRecommendations } from '../../utils/fetchWorkbookRecommendations';
+// ────────────────────────────────────────────────────────────────────────────
+
 import './SummaryView.css';
 
+const AD_SLOT_ID = null; // unused with Ezoic
+
+/* ---------- Constants ---------- */
 const SELECT_WITH_COUNTS = `*,
   likes_count:likes!likes_post_id_fkey(count),
+  views_count:views!views_post_id_fkey(count),
   comments_count:comments!comments_post_id_fkey(count)
 `;
-
-/* ---------- Utilities ---------- */
-const toNum = (v) => {
-  if (v == null) return 0;
-  if (Array.isArray(v)) return Number(v[0]?.count ?? 0);
-  if (typeof v === 'object' && 'count' in v) return Number(v.count || 0);
-  return Number(v || 0);
-};
-
-const normalizeRow = (r = {}) => {
-  const tags = Array.isArray(r.tags)
-    ? r.tags.map((t) => (typeof t === 'string' ? t.trim().toLowerCase() : String(t)))
-    : [];
-
-  const ratingCountRaw =
-    r.rating_count ??
-    r.ratings_count ??
-    (Array.isArray(r.rating_count_aggregate)
-      ? (r.rating_count_aggregate[0]?.count ?? 0)
-      : 0) ??
-    0;
-
-  return {
-    id: r.id,
-    slug: r.slug ?? null,
-    title: r.title ?? '',
-    author: r.author ?? '',
-    summary: r.summary ?? null,
-    description: r.description ?? null,
-    category: r.category ?? null,
-    image_url: r.image_url ?? null,
-    affiliate_link: r.affiliate_link ?? null,
-    youtube_url: r.youtube_url ?? null,
-    tags,
-    user_id: r.user_id ?? null,
-    likes_count: toNum(r.likes_count),
-    views_count: Number(r.views_count ?? 0),
-    comments_count: toNum(r.comments_count),
-    avg_rating: Number(r.avg_rating ?? 0),
-    rating_count: Number(ratingCountRaw),
-    created_at: r.created_at ?? null,
-    updated_at: r.updated_at ?? null,
-  };
-};
-
-const extractYouTubeId = (url = '') => {
-  if (!url || typeof url !== 'string') return null;
-  const patterns = [
-    /[?&]v=([0-9A-Za-z_-]{11})/,
-    /youtu\.be\/([0-9A-Za-z_-]{11})/,
-    /\/embed\/([0-9A-Za-z_-]{11})/,
-    /\/v\/([0-9A-Za-z_-]{11})/,
-    /\/watch\/([0-9A-Za-z_-]{11})/,
-  ];
-  for (const re of patterns) {
-    const m = url.match(re);
-    if (m && m[1]) return m[1];
-  }
-  const anyMatch = url.match(/([0-9A-Za-z_-]{11})/);
-  return anyMatch ? anyMatch[1] : null;
-};
-
-const stripHtml = (html = '') => String(html || '').replace(/<[^>]*>/g, '').trim();
-
-const makeSafeDescription = (raw = '', maxLen = 140) => {
-  const cleaned = DOMPurify.sanitize(String(raw || ''), { ALLOWED_TAGS: [] });
-  const plain = stripHtml(cleaned);
-  return plain.length > maxLen ? `${plain.slice(0, maxLen)}…` : plain;
-};
-
-const buildLightItem = (nr = {}, src = {}) => {
-  const rawDesc =
-    (src.description !== undefined ? src.description : null) ??
-    (nr.description !== undefined ? nr.description : null) ??
-    src.desc ??
-    src.blurb ??
-    src.short_description ??
-    null;
-
-  const description = String(rawDesc || '').trim();
-  const safeDesc = makeSafeDescription(description, 140);
-
-  return {
-    id: nr.id,
-    slug: nr.slug,
-    title: nr.title,
-    author: nr.author,
-    description: safeDesc,
-    category: nr.category,
-    image_url: nr.image_url,
-    avg_rating: nr.avg_rating || 0,
-    likes_count: nr.likes_count || 0,
-    views_count: nr.views_count || 0,
-    comments_count: nr.comments_count || 0,
-    tags: nr.tags || [],
-    user_id: nr.user_id ?? null,
-    created_at: nr.created_at ?? null,
-  };
-};
 
 /* ---------- Theme tokens ---------- */
 const THEMES = {
@@ -144,16 +67,134 @@ const THEMES = {
   },
 };
 
+/* ---------- Small utilities (identical to File 3) ---------- */
+const toNum = (v) => {
+  if (v == null) return 0;
+  if (Array.isArray(v)) return Number(v[0]?.count ?? 0);
+  if (typeof v === 'object' && 'count' in v) return Number(v.count || 0);
+  return Number(v || 0);
+};
+
+const normalizeRow = (r = {}) => {
+  const tags = Array.isArray(r.tags) ? r.tags.map(t => (typeof t === 'string' ? t.trim().toLowerCase() : String(t))) : [];
+
+  const ratingCountRaw = r.rating_count
+    ?? r.ratings_count
+    ?? (Array.isArray(r.rating_count_aggregate) ? (r.rating_count_aggregate[0]?.count ?? 0) : 0)
+    ?? 0;
+
+  return {
+    id: r.id,
+    slug: r.slug ?? null,
+    title: r.title ?? '',
+    author: r.author ?? '',
+    summary: r.summary ?? null,
+    description: r.description ?? null,
+    category: r.category ?? null,
+    image_url: r.image_url ?? null,
+    affiliate_link: r.affiliate_link ?? null,
+    youtube_url: r.youtube_url ?? null,
+    tags,
+    user_id: r.user_id ?? null,
+    likes_count: toNum(r.likes_count),
+    views_count: toNum(r.views_count),
+    comments_count: toNum(r.comments_count),
+    avg_rating: Number(r.avg_rating ?? 0),
+    rating_count: Number(ratingCountRaw),
+    difficulty_level: r.difficulty_level ?? null,
+    created_at: r.created_at ?? null,
+    updated_at: r.updated_at ?? null,
+  };
+};
+
+const extractYouTubeId = (url = '') => {
+  if (!url || typeof url !== 'string') return null;
+  const patterns = [
+    /[?&]v=([0-9A-Za-z_-]{11})/,
+    /youtu\.be\/([0-9A-Za-z_-]{11})/,
+    /\/embed\/([0-9A-Za-z_-]{11})/,
+    /\/v\/([0-9A-Za-z_-]{11})/,
+    /\/watch\/([0-9A-Za-z_-]{11})/,
+  ];
+  for (const re of patterns) {
+    const m = url.match(re);
+    if (m && m[1]) return m[1];
+  }
+  const anyMatch = url.match(/([0-9A-Za-z_-]{11})/);
+  return anyMatch ? anyMatch[1] : null;
+};
+
+const stripHtml = (html = '') => String(html || '').replace(/<[^>]*>/g, '').trim();
+const makeSafeDescription = (raw = '', maxLen = 140) => {
+  const cleaned = DOMPurify.sanitize(String(raw || ''), { ALLOWED_TAGS: [] });
+  const plain = stripHtml(cleaned);
+  return plain.length > maxLen ? `${plain.slice(0, maxLen)}…` : plain;
+};
+
+const buildLightItem = (nr = {}, src = {}) => {
+  let rawDesc =
+    (src.description !== undefined ? src.description : null) ?? (nr.description !== undefined ? nr.description : null) ?? src.desc ?? src.blurb ?? src.short_description ?? null;
+
+  let description = String(rawDesc || '').trim();
+  const safeDesc = makeSafeDescription(description, 140);
+
+  return {
+    id: nr.id,
+    slug: nr.slug,
+    title: nr.title,
+    author: nr.author,
+    description: safeDesc,
+    category: nr.category,
+    image_url: nr.image_url,
+    avg_rating: nr.avg_rating || 0,
+    likes_count: nr.likes_count || 0,
+    views_count: nr.views_count || 0,
+    comments_count: nr.comments_count || 0,
+    tags: nr.tags || [],
+    user_id: nr.user_id ?? null,
+    created_at: nr.created_at ?? null,
+    difficulty_level: nr.difficulty_level ?? null,
+  };
+};
+
+/* ---------- Loader component (unchanged from File 3) ---------- */
+const InlineLoader = ({ label = 'Loading content' }) => (
+  <div className="summary-inline-loader" aria-live="polite" aria-busy="true" role="status" style={{ textAlign: 'center', padding: 20 }}>
+    <div className="dots" aria-hidden="true" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+      <span className="dot" />
+      <span className="dot" />
+      <span className="dot" />
+    </div>
+    <div style={{ marginTop: 8, color: '#6b7280' }}>{label}…</div>
+    <style>{`
+      .summary-inline-loader .dot {
+        width: 10px; height: 10px; border-radius: 50%; background: #2563eb;
+        display: inline-block; transform: translateY(0);
+        animation: summary-dot 1s infinite ease-in-out;
+      }
+      .summary-inline-loader .dot:nth-child(2) { animation-delay: 0.12s; }
+      .summary-inline-loader .dot:nth-child(3) { animation-delay: 0.24s; }
+      @keyframes summary-dot {
+        0% { transform: translateY(0); opacity: 0.4; }
+        40% { transform: translateY(-8px); opacity: 1; }
+        80% { transform: translateY(0); opacity: 0.6; }
+        100% { transform: translateY(0); opacity: 0.4; }
+      }
+    `}</style>
+  </div>
+);
+
 /* ---------- Component ---------- */
 const SummaryView = () => {
   const { param } = useParams();
   const navigate = useNavigate();
 
-  /* ── NEW: theme + font size state ── */
+  /* ---------- State ---------- */
+  // ── READING UX STATE ──────────────────────────────────────────────────────
   const [theme, setTheme] = useState('white');   // 'white' | 'brown'
   const [fontSize, setFontSize] = useState(18);  // px
-
   const T = THEMES[theme];
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [summary, setSummary] = useState(null);
   const [postId, setPostId] = useState(null);
@@ -177,9 +218,55 @@ const SummaryView = () => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
 
+  const [processedSummaryHtml, setProcessedSummaryHtml] = useState('');
+  const [slotWorkbooks, setSlotWorkbooks] = useState([]);
+
+  useEffect(() => {
+    if (!summary?.id) return;
+    if (summary?.category === 'Workbooks') { setSlotWorkbooks([]); return; }
+    fetchWorkbookRecommendations(summary, 8)
+      .then(workbooks => setSlotWorkbooks(workbooks))
+      .catch(() => setSlotWorkbooks([]));
+  }, [summary?.id]);
+
+  const articleSegments = useMemo(
+    () => injectAds(processedSummaryHtml),
+    [processedSummaryHtml]
+  );
+
+  useEffect(() => {
+    if (!articleSegments || articleSegments.length === 0) return;
+    const adSegments = articleSegments.filter(s => s.type === 'ad');
+    if (adSegments.length === 0) return;
+
+    const ezoicIds = adSegments
+      .filter(s => !slotWorkbooks[s.adIndex - 1])
+      .map(s => 100 + s.adIndex);
+
+    if (ezoicIds.length === 0) return;
+
+    try {
+      window.ezstandalone = window.ezstandalone || {};
+      window.ezstandalone.cmd = window.ezstandalone.cmd || [];
+      window.ezstandalone.cmd.push(function () {
+        window.ezstandalone.destroyAll();
+        window.ezstandalone.showAds(...ezoicIds);
+      });
+    } catch (e) {}
+
+    return () => {
+      try {
+        window.ezstandalone.cmd.push(function () { window.ezstandalone.destroyAll(); });
+      } catch (e) {}
+    };
+  }, [articleSegments, slotWorkbooks]);
+
+  /* ---------- Refs ---------- */
   const pageRef = useRef(null);
   const headerRef = useRef(null);
+  const slugCache = useRef(new Map());
 
+  /* ---------- Auth ---------- */
   useEffect(() => {
     (async () => {
       try {
@@ -191,65 +278,65 @@ const SummaryView = () => {
     })();
   }, []);
 
-  useEffect(() => {
+  /* ---------- Scroll to top ---------- */
+  const scrollToTop = useCallback((behavior = 'auto') => {
     try {
-      const scrollToTop = () => {
-        try {
-          const main = document.querySelector('.main-content');
-          if (main && typeof main.scrollTo === 'function') {
-            main.scrollTo({ top: 0, behavior: 'auto' });
-            return;
-          }
-          if (pageRef.current && typeof pageRef.current.scrollTo === 'function') {
-            pageRef.current.scrollTo({ top: 0, behavior: 'auto' });
-            return;
-          }
-          if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
-            window.scrollTo(0, 0);
-            if (document?.documentElement) document.documentElement.scrollTop = 0;
-            if (document?.body) document.body.scrollTop = 0;
-          }
-        } catch (e) {}
-      };
-      scrollToTop();
-    } catch (e) {}
-  }, [param]);
+      const mainEl = document.querySelector('.main-content');
+      const scrollEl = (mainEl && typeof mainEl.scrollTo === 'function')
+        ? mainEl
+        : (pageRef.current && typeof pageRef.current.scrollTo === 'function') ? pageRef.current
+        : (document.scrollingElement || document.documentElement || document.body);
 
+      if (window && window.location && window.location.hash) {
+        const urlNoHash = window.location.pathname + window.location.search;
+        try { window.history.replaceState(null, '', urlNoHash); } catch (e) {}
+      }
+
+      if (scrollEl && typeof scrollEl.scrollTo === 'function') {
+        try { scrollEl.scrollTo({ top: 0, left: 0, behavior }); } catch (e) { scrollEl.scrollTop = 0; }
+      } else if (typeof window.scrollTo === 'function') {
+        try { window.scrollTo({ top: 0, left: 0, behavior }); } catch (e) { window.scrollTo(0, 0); }
+      } else {
+        if (document && document.documentElement) document.documentElement.scrollTop = 0;
+        if (document && document.body) document.body.scrollTop = 0;
+      }
+    } catch (e) {
+      try { window.scrollTo(0, 0); } catch (ee) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToTop('auto');
+    requestAnimationFrame(() => scrollToTop('smooth'));
+    const t = setTimeout(() => scrollToTop('auto'), 120);
+    return () => clearTimeout(t);
+  }, [param, scrollToTop]);
+
+  /* ---------- Recommendation functions (identical to File 3) ---------- */
   const fetchRecommendedByTags = useCallback(async (tags = [], limit = 10, resolvedPostId = null) => {
     setIsRecommending(true);
     setRecError(null);
     try {
-      const lowerTags = (Array.isArray(tags) ? tags : [])
-        .map((t) => (t || '').toLowerCase().trim())
-        .filter(Boolean);
-
-      if (lowerTags.length === 0) {
-        setRecommendedContent([]);
-        return [];
-      }
+      const lowerTags = (Array.isArray(tags) ? tags : []).map(t => (t || '').toLowerCase().trim()).filter(Boolean);
+      if (lowerTags.length === 0) { setRecommendedContent([]); return []; }
 
       const { data, error } = await supabase
         .from('book_summaries')
-        .select(
-          `id, title, author, description, image_url, slug, category, avg_rating,
+        .select(`id, title, author, description, image_url, slug, category, difficulty_level, avg_rating,
            likes_count:likes!likes_post_id_fkey(count),
+           views_count:views!views_post_id_fkey(count),
            comments_count:comments!comments_post_id_fkey(count),
-           views_count, tags, user_id, created_at`
-        )
+           tags, user_id, created_at`)
         .neq('id', resolvedPostId)
         .limit(500);
 
       if (error) throw error;
 
-      const rows = (data || [])
-        .map((d) => buildLightItem(normalizeRow(d), d))
-        .filter((r) => {
-          const postTags = Array.isArray(r.tags) ? r.tags.map((t) => (t || '').toLowerCase().trim()) : [];
-          return postTags.some((t) => lowerTags.includes(t));
-        })
-        .map((r) => {
-          const postTags = Array.isArray(r.tags) ? r.tags.map((t) => (t || '').toLowerCase().trim()) : [];
-          const matchCount = postTags.filter((t) => lowerTags.includes(t)).length;
+      const rows = (data || []).map(d => buildLightItem(normalizeRow(d), d))
+        .filter(r => (Array.isArray(r.tags) ? r.tags.map(t => (t||'').toLowerCase()) : []).some(t => lowerTags.includes(t)))
+        .map(r => {
+          const postTags = Array.isArray(r.tags) ? r.tags.map(t => (t || '').toLowerCase().trim()) : [];
+          const matchCount = postTags.filter(t => lowerTags.includes(t)).length;
           return { r, matchCount };
         });
 
@@ -262,7 +349,7 @@ const SummaryView = () => {
         return tb - ta;
       });
 
-      const top = rows.map((x) => x.r).slice(0, limit);
+      const top = rows.map(x => x.r).slice(0, limit);
       setRecommendedContent(top);
       return top;
     } catch (err) {
@@ -280,35 +367,27 @@ const SummaryView = () => {
     setRecError(null);
     try {
       const cat = String(category ?? '').trim();
-      if (!cat) {
-        setRecommendedContent([]);
-        return [];
-      }
+      if (!cat) { setRecommendedContent([]); return []; }
 
       const { data, error } = await supabase
         .from('book_summaries')
-        .select(
-          `id, title, author, description, image_url, slug, category, avg_rating,
+        .select(`id, title, author, description, image_url, slug, category, difficulty_level, avg_rating,
            likes_count:likes!likes_post_id_fkey(count),
+           views_count:views!views_post_id_fkey(count),
            comments_count:comments!comments_post_id_fkey(count),
-           views_count, tags, user_id, created_at`
-        )
+           tags, user_id, created_at`)
         .neq('id', resolvedPostId)
         .eq('category', cat)
         .limit(500);
 
       if (error) throw error;
 
-      const rows = (data || [])
-        .map((d) => buildLightItem(normalizeRow(d), d))
-        .filter((r) => String(r.id) !== String(resolvedPostId));
+      const rows = (data || []).map(d => buildLightItem(normalizeRow(d), d)).filter(r => String(r.id) !== String(resolvedPostId));
 
       rows.sort((a, b) => {
-        const vb = Number(b.views_count || 0);
-        const va = Number(a.views_count || 0);
+        const vb = Number(b.views_count || 0); const va = Number(a.views_count || 0);
         if (vb !== va) return vb - va;
-        const lb = Number(b.likes_count || 0);
-        const la = Number(a.likes_count || 0);
+        const lb = Number(b.likes_count || 0); const la = Number(a.likes_count || 0);
         if (lb !== la) return lb - la;
         const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
         const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -328,111 +407,8 @@ const SummaryView = () => {
     }
   }, []);
 
-  const recordView = useCallback(async (resolvedPostId) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('views').insert([
-        { post_id: resolvedPostId, user_id: user?.id ?? null },
-      ]);
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error inserting view:', err);
-    }
-  }, []);
-
-  const refreshViewsCount = useCallback(async (resolvedPostId) => {
-    try {
-      const { data, error } = await supabase
-        .from('book_summaries')
-        .select('views_count')
-        .eq('id', resolvedPostId)
-        .single();
-      if (!error && data) setViews(Number(data.views_count) || 0);
-    } catch (err) {
-      console.error('Error refreshing views count:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadMinimalSummary = async () => {
-      setIsLoading(true);
-      setSummary(null);
-      setPostId(null);
-
-      try {
-        const { data: slugData } = await supabase
-          .from('book_summaries')
-          .select(
-            `id, slug, title, author, description, category, image_url,
-             affiliate_link, youtube_url, tags, user_id, views_count, created_at`
-          )
-          .eq('slug', param)
-          .maybeSingle();
-
-        let data = slugData ?? null;
-        let fetchedBy = null;
-
-        if (data) {
-          fetchedBy = 'slug';
-        } else {
-          const { data: idData } = await supabase
-            .from('book_summaries')
-            .select(
-              `id, slug, title, author, description, category, image_url,
-               affiliate_link, youtube_url, tags, user_id, views_count, created_at`
-            )
-            .eq('id', param)
-            .maybeSingle();
-          data = idData ?? null;
-          if (data) fetchedBy = 'id';
-        }
-
-        if (!mounted) return;
-
-        if (!data) {
-          setIsLoading(false);
-          setSummary(null);
-          return;
-        }
-
-        if (fetchedBy === 'id' && data.slug && data.slug !== param) {
-          navigate(`/summary/${data.slug}`, { replace: true });
-          return;
-        }
-
-        const normalized = normalizeRow(data);
-        normalized.category = normalized?.category == null ? '' : String(normalized.category).trim();
-
-        setSummary(normalized);
-        setPostId(normalized.id);
-        setOwnerId(normalized.user_id ?? null);
-
-        setLikes(0);
-        setViews(Number(normalized.views_count) || 0);
-        setCommentsCount(0);
-
-        setIsLoading(false);
-
-        backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags, true).catch((e) =>
-          console.debug(e)
-        );
-      } catch (err) {
-        console.error('Error loading minimal summary:', err);
-        if (mounted) {
-          setIsLoading(false);
-          setSummary(null);
-          setPostId(null);
-        }
-      }
-    };
-
-    loadMinimalSummary();
-    return () => { mounted = false; };
-  }, [param, navigate]);
-
-  const backgroundFetchFollowups = async (resolvedPostId, category = '', tags = [], shouldIncrementView = true) => {
+  /* ---------- Data followups (identical to File 3) ---------- */
+  const backgroundFetchFollowups = useCallback(async (resolvedPostId, category = '', tags = []) => {
     try {
       const { data, error } = await supabase
         .from('book_summaries')
@@ -442,8 +418,8 @@ const SummaryView = () => {
 
       if (!error && data) {
         const formatted = normalizeRow(data);
-        formatted.category = formatted?.category == null ? '' : String(formatted.category).trim();
-        setSummary((prev) => (prev ? { ...prev, ...formatted } : formatted));
+        formatted.category = (formatted?.category == null) ? '' : String(formatted.category).trim();
+        setSummary((prev) => prev ? { ...prev, ...formatted } : formatted);
         setOwnerId(formatted.user_id ?? null);
         setLikes(formatted.likes_count || 0);
         setViews(formatted.views_count || 0);
@@ -469,9 +445,16 @@ const SummaryView = () => {
         }
       } catch (e) {}
 
-      if (shouldIncrementView) {
-        await recordView(resolvedPostId);
-        await refreshViewsCount(resolvedPostId);
+      try {
+        const { getGeo, getSource } = await import('../../utils/trackView');
+        const [geo, source] = await Promise.all([getGeo(), Promise.resolve(getSource())]);
+        await supabase.rpc('increment_views', { post_id: resolvedPostId, country: geo.country, city: geo.city, source });
+        setViews((v) => (Number(v) || 0) + 1);
+      } catch (e) {
+        try {
+          await supabase.rpc('increment_views', { post_id: resolvedPostId });
+          setViews((v) => (Number(v) || 0) + 1);
+        } catch (e2) {}
       }
 
       if (Array.isArray(tags) && tags.length > 0) {
@@ -484,13 +467,71 @@ const SummaryView = () => {
     } catch (err) {
       console.error('backgroundFetchFollowups error', err);
     }
-  };
+  }, [fetchRecommendedByCategory, fetchRecommendedByTags]);
 
+  /* ---------- Data loading (identical to File 3) ---------- */
+  useEffect(() => {
+    let mounted = true;
+    const loadMinimalSummary = async () => {
+      setIsLoading(true);
+      setSummary(null);
+      setPostId(null);
+
+      try {
+        const { data: slugData } = await supabase
+          .from('book_summaries')
+          .select(`id, slug, title, author, description, category, image_url, affiliate_link, youtube_url, tags, difficulty_level, user_id, created_at`)
+          .eq('slug', param)
+          .maybeSingle();
+
+        let data = slugData ?? null;
+        let fetchedBy = null;
+
+        if (data) fetchedBy = 'slug';
+        else {
+          const { data: idData } = await supabase
+            .from('book_summaries')
+            .select(`id, slug, title, author, description, category, image_url, affiliate_link, youtube_url, tags, difficulty_level, user_id, created_at`)
+            .eq('id', param)
+            .maybeSingle();
+          data = idData ?? null;
+          if (data) fetchedBy = 'id';
+        }
+
+        if (!mounted) return;
+        if (!data) { setIsLoading(false); setSummary(null); return; }
+
+        if (fetchedBy === 'id' && data.slug && data.slug !== param) {
+          navigate(`/summary/${data.slug}`, { replace: true });
+          return;
+        }
+
+        const normalized = normalizeRow(data);
+        normalized.category = (normalized?.category == null) ? '' : String(normalized.category).trim();
+
+        setSummary(normalized);
+        setPostId(normalized.id);
+        setOwnerId(normalized.user_id ?? null);
+        setLikes(0); setViews(0); setCommentsCount(0);
+        setIsLoading(false);
+
+        backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags).catch((e) => console.debug(e));
+      } catch (err) {
+        console.error('Error loading content:', err);
+        if (mounted) { setIsLoading(false); setSummary(null); setPostId(null); }
+      }
+    };
+
+    loadMinimalSummary();
+    return () => { mounted = false; };
+  }, [param, navigate, backgroundFetchFollowups]);
+
+  /* ---------- Interaction handlers (identical to File 3) ---------- */
   const handleLike = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert('Please sign in to like summaries.'); return; }
-      if (!postId) { alert('Post not ready. Please try again.'); return; }
+      if (!user) { alert('Please sign in to like content.'); return; }
+      if (!postId) { alert('Content not ready. Please try again.'); return; }
 
       if (userHasLiked) {
         const { error } = await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user.id);
@@ -513,14 +554,10 @@ const SummaryView = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { alert('Please sign in to rate'); return false; }
-      if (!postId) { alert('Post not ready. Try again later.'); return false; }
+      if (!postId) { alert('Content not ready. Try again later.'); return false; }
 
       setSavingRating(true);
-      const { error } = await supabase.rpc('rate_post', {
-        p_post_id: postId,
-        p_user_id: user.id,
-        p_rating: value,
-      });
+      const { error } = await supabase.rpc('rate_post', { p_post_id: postId, p_user_id: user.id, p_rating: value });
 
       if (error) { console.error('rate_post rpc error', error); alert('Could not save rating. Try again later.'); return false; }
 
@@ -554,15 +591,11 @@ const SummaryView = () => {
       const on = i <= active;
       arr.push(
         <button
-          key={i}
-          type="button"
+          key={i} type="button"
           className={`star-button ${on ? 'active' : ''} ${size === 'sm' ? 'small' : ''}`}
-          onMouseEnter={() => setHoverRating(i)}
-          onMouseLeave={() => setHoverRating(0)}
-          onFocus={() => setHoverRating(i)}
-          onBlur={() => setHoverRating(0)}
-          onClick={() => handleSetRating(i)}
-          disabled={savingRating}
+          onMouseEnter={() => setHoverRating(i)} onMouseLeave={() => setHoverRating(0)}
+          onFocus={() => setHoverRating(i)} onBlur={() => setHoverRating(0)}
+          onClick={() => handleSetRating(i)} disabled={savingRating}
           aria-label={`Rate ${i} star${i > 1 ? 's' : ''}`}
         >
           <FaStar />
@@ -572,68 +605,141 @@ const SummaryView = () => {
     return arr;
   };
 
-  useEffect(() => {
-    const scroller = document.querySelector('.main-content') || window;
-    let ticking = false;
+  const handleBackToArticle = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate('/explore');
+  };
 
-    const getScrollValue = () => {
-      if (scroller === window) {
-        if (!pageRef.current) return window.scrollY || 0;
-        const rect = pageRef.current.getBoundingClientRect();
-        return Math.max(0, -rect.top);
+  const handleExploreRelated = () => {
+    const tagsArr = Array.isArray(summary?.tags) ? summary.tags.map(t => (t || '').trim()).filter(Boolean) : [];
+    if (tagsArr.length > 0) navigate(`/explore?tag=${encodeURIComponent(tagsArr[0])}`);
+    else if (summary?.category) navigate(`/explore?category=${encodeURIComponent(summary.category)}`);
+    else navigate('/explore');
+  };
+
+  /* ---------- Link resolution (identical to File 3) ---------- */
+  const resolveInternalLinksInHtml = useCallback(async (html) => {
+    if (!html) return '';
+    const sanitized = DOMPurify.sanitize(html, { ADD_ATTR: ['data-summary-id'] });
+    const container = document.createElement('div');
+    container.innerHTML = sanitized;
+
+    const anchors = Array.from(container.querySelectorAll('a[data-summary-id]'));
+    const fallbackAnchors = anchors.length === 0 ? Array.from(container.querySelectorAll('a[href*="#summary-"]')) : [];
+    const targets = new Map();
+
+    anchors.forEach(a => {
+      const id = String(a.getAttribute('data-summary-id') || '').trim();
+      if (id) { if (!targets.has(id)) targets.set(id, []); targets.get(id).push(a); }
+    });
+
+    fallbackAnchors.forEach(a => {
+      const href = a.getAttribute('href') || '';
+      const m = href.match(/#summary-([0-9a-fA-F-]+)/);
+      if (m && m[1]) {
+        const key = String(m[1]);
+        a.setAttribute('data-summary-id', key);
+        if (!targets.has(key)) targets.set(key, []);
+        targets.get(key).push(a);
       }
-      return scroller.scrollTop;
-    };
+    });
 
-    const t = 100;
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const sc = getScrollValue();
-        setCollapsed(sc < t);
-        ticking = false;
-      });
-    };
+    if (targets.size === 0) return container.innerHTML;
 
-    if (scroller === window) {
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('wheel', onScroll, { passive: true });
-      window.addEventListener('touchmove', onScroll, { passive: true });
-    } else {
-      scroller.addEventListener('scroll', onScroll, { passive: true });
-      scroller.addEventListener('wheel', onScroll, { passive: true });
-      scroller.addEventListener('touchmove', onScroll, { passive: true });
+    const idsToFetch = Array.from(targets.keys()).filter(id => !slugCache.current.has(id));
+    let fetched = [];
+    if (idsToFetch.length > 0) {
+      try {
+        const { data, error } = await supabase.from('book_summaries').select('id, slug').in('id', idsToFetch);
+        if (!error && Array.isArray(data)) fetched = data;
+      } catch (e) { console.error('Error fetching slugs for internal links', e); }
+
+      (fetched || []).forEach(r => { try { slugCache.current.set(String(r.id), r.slug || null); } catch (e) {} });
+      idsToFetch.forEach(id => { if (!slugCache.current.has(id)) slugCache.current.set(id, null); });
     }
 
-    requestAnimationFrame(onScroll);
-    return () => {
-      if (scroller === window) {
-        window.removeEventListener('scroll', onScroll);
-        window.removeEventListener('wheel', onScroll);
-        window.removeEventListener('touchmove', onScroll);
-      } else {
-        scroller.removeEventListener('scroll', onScroll);
-        scroller.removeEventListener('wheel', onScroll);
-        scroller.removeEventListener('touchmove', onScroll);
+    targets.forEach((anchorNodes, id) => {
+      const slug = slugCache.current.get(id) || null;
+      anchorNodes.forEach(a => {
+        if (slug) {
+          a.setAttribute('href', `/summary/${slug}`);
+          a.setAttribute('data-summary-slug', slug);
+          a.classList.add('internal-summary-link');
+        } else {
+          a.removeAttribute('href');
+          a.classList.add('internal-summary-link-broken');
+          a.setAttribute('aria-disabled', 'true');
+          a.title = a.title || 'Linked content not found';
+        }
+      });
+    });
+
+    return container.innerHTML;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!summary?.summary) { setProcessedSummaryHtml(''); return; }
+      try {
+        const resolved = await resolveInternalLinksInHtml(summary.summary);
+        if (!cancelled) setProcessedSummaryHtml(resolved);
+      } catch (e) {
+        console.error('Could not process content HTML', e);
+        if (!cancelled) setProcessedSummaryHtml(DOMPurify.sanitize(summary.summary));
       }
     };
-  }, [summary]);
+    run();
+    return () => { cancelled = true; };
+  }, [summary?.summary, resolveInternalLinksInHtml]);
 
-  const BRAND = 'ONJO REVIEW';
+  /* ---------- Intercept article clicks (identical to File 3) ---------- */
+  const onArticleClick = (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    const dataSlug = a.getAttribute('data-summary-slug');
+    const isExternal = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(href);
+    if (isExternal) return;
+    const isInternal = dataSlug || href.startsWith('/summary/');
+    if (!isInternal) return;
+    e.preventDefault();
+    const slug = dataSlug || href.replace(/^\/summary\//, '').split(/[/?#]/)[0] || null;
+    if (slug) {
+      navigate(`/summary/${slug}`);
+      setTimeout(() => scrollToTop('auto'), 10);
+      requestAnimationFrame(() => scrollToTop('smooth'));
+      setTimeout(() => scrollToTop('auto'), 150);
+    }
+  };
+
+  /* ---------- Share (identical to File 3) ---------- */
+  const handleShare = async () => {
+    if (!summary) return;
+    const title = summary.title || 'Check this out on OGONJO';
+    const description = makeSafeDescription(summary.description || summary.summary || '', 140);
+    const shareText = `${title}\n\n${description}\n\nRead more on OGONJO:\n${pageUrl}`;
+
+    if (navigator.share) {
+      try { await navigator.share({ title, text: description, url: pageUrl }); return; } catch (e) {}
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try { await navigator.clipboard.writeText(shareText); alert('Link + description copied to clipboard!'); return; } catch (e) {}
+    }
+    try { window.prompt('Copy the text below to share:', shareText); } catch (e) {
+      alert('Unable to copy automatically. Please copy the URL: ' + pageUrl);
+    }
+  };
+
+  /* ---------- Meta (identical to File 3) ---------- */
+  const BRAND = 'OGONJO';
   const SITE_DEFAULT_OG = useMemo(() => {
-    try {
-      if (typeof window !== 'undefined' && window.location.origin)
-        return `${window.location.origin}/ogonjo.jpg`;
-    } catch (e) {}
+    try { if (typeof window !== 'undefined' && window.location.origin) return `${window.location.origin}/ogonjo.jpg`; } catch (e) {}
     return 'https://your-ogonjo-app.netlify.app/ogonjo.jpg';
   }, []);
 
   const metaTitle = useMemo(() => `${summary?.title || 'Loading…'} – ${BRAND}`, [summary?.title]);
-  const metaDescription = useMemo(
-    () => makeSafeDescription(summary?.description || summary?.summary || '', 160),
-    [summary?.description, summary?.summary]
-  );
+  const metaDescription = useMemo(() => makeSafeDescription(summary?.description || summary?.summary || '', 160), [summary?.description, summary?.summary]);
 
   const pageUrl = useMemo(() => {
     try {
@@ -642,7 +748,7 @@ const SummaryView = () => {
         return `${u.origin}${u.pathname}`;
       }
     } catch (e) {}
-    return `https://onjoreviews.com/review/${summary?.slug || summary?.id || ''}`;
+    return `https://ogonjo.com/summary/${summary?.slug || summary?.id || ''}`;
   }, [summary?.slug, summary?.id]);
 
   const ogImage = summary?.image_url || SITE_DEFAULT_OG;
@@ -651,147 +757,63 @@ const SummaryView = () => {
     const ratingValue = avgRating || summary?.avg_rating || undefined;
     const ratingCount = summary?.rating_count || undefined;
     const reviewCount = commentsCount || (summary?.comments_count || undefined);
-
     const base = {
-      '@context': 'https://schema.org',
-      '@type': 'Article',
-      headline: summary?.title || BRAND,
-      description: metaDescription,
-      author: { '@type': 'Person', name: summary?.author || BRAND },
-      datePublished: summary?.created_at || undefined,
-      dateModified: summary?.updated_at || summary?.created_at || undefined,
-      image: ogImage,
-      mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
-      publisher: {
-        '@type': 'Organization',
-        name: BRAND,
-        logo: { '@type': 'ImageObject', url: SITE_DEFAULT_OG },
-      },
+      "@context": "https://schema.org", "@type": "Article",
+      "headline": summary?.title || BRAND, "description": metaDescription,
+      "author": { "@type": "Person", "name": summary?.author || BRAND },
+      "datePublished": summary?.created_at || undefined,
+      "dateModified": summary?.updated_at || summary?.created_at || undefined,
+      "image": ogImage,
+      "mainEntityOfPage": { "@type": "WebPage", "@id": pageUrl },
+      "publisher": { "@type": "Organization", "name": BRAND, "logo": { "@type": "ImageObject", "url": SITE_DEFAULT_OG } }
     };
-
     if (ratingValue || ratingCount || reviewCount) {
-      base.aggregateRating = {
-        '@type': 'AggregateRating',
-        ...(ratingValue ? { ratingValue: Number(ratingValue).toFixed(1) } : {}),
-        ...(ratingCount ? { ratingCount: Number(ratingCount) } : {}),
-        ...(reviewCount ? { reviewCount: Number(reviewCount) } : {}),
-      };
+      base.aggregateRating = { "@type": "AggregateRating", ...(ratingValue ? { "ratingValue": Number(ratingValue).toFixed(1) } : {}), ...(ratingCount ? { "ratingCount": Number(ratingCount) } : {}), ...(reviewCount ? { "reviewCount": Number(reviewCount) } : {}) };
     }
-
     try {
-      const origin =
-        typeof window !== 'undefined' && window.location.origin ? window.location.origin : '';
+      const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : '';
       base.breadcrumb = {
-        '@type': 'BreadcrumbList',
-        itemListElement: [
-          { '@type': 'ListItem', position: 1, name: 'Home', item: `${origin}/` },
-          { '@type': 'ListItem', position: 2, name: 'Reviews', item: `${origin}/explore` },
-          { '@type': 'ListItem', position: 3, name: summary?.title || 'Review', item: pageUrl },
-        ],
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": `${origin}/` },
+          { "@type": "ListItem", "position": 2, "name": "Library", "item": `${origin}/explore` },
+          { "@type": "ListItem", "position": 3, "name": summary?.title || "Content", "item": pageUrl }
+        ]
       };
-    } catch (e) {}
-
+    } catch(e) {}
     return base;
   }, [summary, metaDescription, ogImage, pageUrl, SITE_DEFAULT_OG, BRAND, avgRating, commentsCount]);
 
   const viewAllLinkForTags = useMemo(() => {
-    const tagsArr = Array.isArray(summary?.tags)
-      ? summary.tags.map((t) => (t || '').trim()).filter(Boolean)
-      : [];
+    const tagsArr = Array.isArray(summary?.tags) ? summary.tags.map(t => (t || '').trim()).filter(Boolean) : [];
     if (tagsArr.length === 0) return `/explore`;
     return `/explore?tag=${encodeURIComponent(tagsArr[0])}`;
   }, [summary?.tags]);
 
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#fdf8f4',
-          fontFamily: '"Times New Roman", Times, serif',
-        }}
-        role="status"
-        aria-live="polite"
-      >
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              border: '3px solid #e8ddd0',
-              borderTop: '3px solid #8b5e3c',
-              borderRadius: '50%',
-              animation: 'onjo-spin 0.9s linear infinite',
-              margin: '0 auto 16px',
-            }}
-          />
-          <div style={{ color: '#8b5e3c', fontSize: 15, letterSpacing: '0.08em' }}>Loading…</div>
-        </div>
-        <style>{`@keyframes onjo-spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  if (!summary) return (
-    <div style={{ padding: 28, fontFamily: '"Times New Roman", Times, serif', color: '#6b5f4a' }}>
-      Summary not found.
-    </div>
-  );
-
-  const processedSummary = summary.summary ? DOMPurify.sanitize(summary.summary) : '';
-  const youtubeId = extractYouTubeId(summary.youtube_url);
-
-  let affiliateUrl = null;
-  let affiliateLabel = null;
-  let affiliateType = null;
-  const rawAffiliate = summary?.affiliate_link ?? null;
-
-  if (rawAffiliate) {
-    try {
-      if (typeof rawAffiliate === 'string') {
-        const parts = rawAffiliate.split('|', 2).map((p) => (p || '').trim());
-        if (parts.length === 2 && parts[1]) {
-          affiliateType = (parts[0] || '').toLowerCase();
-          affiliateUrl = parts[1];
-        } else {
-          affiliateType = 'book';
-          affiliateUrl = rawAffiliate.trim();
-        }
-      } else if (typeof rawAffiliate === 'object' && rawAffiliate !== null) {
-        if (rawAffiliate.url) {
-          affiliateUrl = String(rawAffiliate.url);
-          affiliateType = (rawAffiliate.type || 'book').toLowerCase();
-        } else if (rawAffiliate.link) {
-          affiliateUrl = String(rawAffiliate.link);
-          affiliateType = (rawAffiliate.type || 'book').toLowerCase();
-        }
-      }
-    } catch (e) {
-      try { affiliateUrl = String(rawAffiliate); affiliateType = 'book'; } catch (ee) { affiliateUrl = null; affiliateType = null; }
-    }
-  }
-
-  if (affiliateUrl) {
-    affiliateLabel =
-      affiliateType === 'pdf' ? 'Get PDF' :
-      affiliateType === 'app' ? 'Open App' :
-      'Get Book';
-  }
-
   const handleEditSaved = (updatedRow) => {
     if (!updatedRow) { setShowEdit(false); return; }
     const normalized = normalizeRow(updatedRow);
-    setSummary((prev) => (prev ? { ...prev, ...normalized } : normalized));
-    backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags, false).catch(() => {});
+    setSummary(prev => prev ? { ...prev, ...normalized } : normalized);
+    backgroundFetchFollowups(normalized.id, normalized.category, normalized.tags).catch(() => {});
     try { window.dispatchEvent(new CustomEvent('summary:updated', { detail: { id: normalized.id } })); } catch (e) {}
     setShowEdit(false);
   };
 
-  /* ── Inline styles (theme-driven) ── */
+  const renderDifficultyBadge = (lvl) => {
+    if (!lvl) return null;
+    const text = String(lvl);
+    const cls = `difficulty-label difficulty-${text.toLowerCase().replace(/\s+/g, '-')}`;
+    return <span className={cls} aria-hidden="false">{text}</span>;
+  };
+
+  /* ---------- Derived flags ---------- */
+  const showLoading = Boolean(isLoading);
+  const showNotFound = !isLoading && !summary;
+  const headerTitle = summary?.title || (showLoading ? 'Loading…' : 'Content Under Development');
+  const headerAuthor = summary?.author || '';
+  const headerImage = summary?.image_url || null;
+
+  /* ---------- Inline styles (theme-driven) ---------- */
   const pageStyle = {
     background: T.bg,
     color: T.text,
@@ -817,9 +839,12 @@ const SummaryView = () => {
     transition: 'background 0.35s, color 0.35s, box-shadow 0.35s',
   };
 
+  /* ======================================================================== */
+  /*  RENDER                                                                   */
+  /* ======================================================================== */
   return (
     <>
-      {/* ── Global article typography overrides ── */}
+      {/* ── Global article typography overrides (theme-driven) ── */}
       <style>{`
         .onjo-article-body p {
           margin: 0 0 1.4em 0;
@@ -859,12 +884,20 @@ const SummaryView = () => {
           margin: 0 0 1.4em;
         }
         .onjo-article-body li { margin-bottom: 0.5em; }
+
+        /* ── LINK STYLE: colored + underline + slight fade on hover ── */
         .onjo-article-body a {
           color: ${T.accent};
           text-decoration: underline;
           text-underline-offset: 3px;
+          transition: opacity 0.18s ease;
         }
-        .onjo-article-body a:hover { opacity: 0.75; }
+        .onjo-article-body a:hover {
+          opacity: 0.65;
+          text-decoration: underline;
+        }
+        /* ────────────────────────────────────────────────────────── */
+
         .onjo-article-body img {
           max-width: 100%;
           border-radius: 6px;
@@ -935,7 +968,7 @@ const SummaryView = () => {
           flex-wrap: wrap;
         }
 
-        /* Tags */
+        /* Tag pills */
         .onjo-tag {
           display: inline-block;
           padding: 3px 10px;
@@ -979,10 +1012,16 @@ const SummaryView = () => {
 
         @media (max-width: 600px) {
           .onjo-article-body-wrap { padding: 0 4px !important; }
+          .onjo-article-body { padding: 20px 16px !important; }
         }
       `}</style>
 
-      <div className={`summary-page ${collapsed ? 'title-collapsed' : ''}`} ref={pageRef} data-collapsed={collapsed ? '1' : '0'} style={pageStyle}>
+      <div
+        className={`summary-page ${collapsed ? 'title-collapsed' : ''}`}
+        ref={pageRef}
+        data-collapsed={collapsed ? '1' : '0'}
+        style={pageStyle}
+      >
         <Helmet>
           <title>{metaTitle}</title>
           <meta name="description" content={metaDescription} />
@@ -994,12 +1033,9 @@ const SummaryView = () => {
           <meta property="og:url" content={pageUrl} />
           <meta property="og:image" content={ogImage} />
           {summary?.created_at && <meta property="article:published_time" content={summary.created_at} />}
-          {(summary?.updated_at || summary?.created_at) && (
-            <meta property="article:modified_time" content={summary?.updated_at || summary?.created_at} />
-          )}
+          {(summary?.updated_at || summary?.created_at) && <meta property="article:modified_time" content={summary?.updated_at || summary?.created_at} />}
           {summary?.author && <meta property="article:author" content={summary.author} />}
-          {Array.isArray(summary?.tags) &&
-            summary.tags.map((t) => <meta key={`og-tag-${t}`} property="article:tag" content={t} />)}
+          {Array.isArray(summary?.tags) && summary.tags.map((t) => (<meta key={`og-tag-${t}`} property="article:tag" content={t} />))}
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:title" content={metaTitle} />
           <meta name="twitter:description" content={metaDescription} />
@@ -1019,11 +1055,11 @@ const SummaryView = () => {
           style={{ background: T.headerBg, borderBottom: `1px solid ${T.border}` }}
         >
           <div className="summary-thumb-wrap" aria-hidden="true">
-            {summary.image_url ? (
+            {headerImage ? (
               <img
                 className={`summary-thumb ${collapsed ? 'collapsed' : ''}`}
-                src={summary.image_url}
-                alt={summary.title}
+                src={headerImage}
+                alt={headerTitle}
                 style={{ borderRadius: 4, boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}
               />
             ) : (
@@ -1037,24 +1073,27 @@ const SummaryView = () => {
           <div className="summary-title-left">
             <h1
               className="summary-title"
-              title={summary.title}
-              style={{
-                fontFamily: '"Times New Roman", Times, serif',
-                color: T.text,
-                letterSpacing: '-0.01em',
-              }}
+              title={headerTitle}
+              style={{ fontFamily: '"Times New Roman", Times, serif', color: T.text, letterSpacing: '-0.01em' }}
             >
-              {summary.title}
+              {headerTitle}
             </h1>
-            <div
-              className="summary-author"
-              style={{ fontFamily: '"Times New Roman", Times, serif', color: T.muted, fontStyle: 'italic' }}
-            >
-              by {summary.author}
+            <div className="summary-meta-row" aria-hidden="false">
+              <div
+                className="summary-author"
+                title={headerAuthor || ''}
+                style={{ fontFamily: '"Times New Roman", Times, serif', color: T.muted, fontStyle: 'italic' }}
+              >
+                <span className="author-prefix">by&nbsp;</span>
+                <span className="author-name">{headerAuthor}</span>
+              </div>
+              <div className="summary-difficulty-inline">
+                {renderDifficultyBadge(summary?.difficulty_level)}
+              </div>
             </div>
 
             {/* Tags row */}
-            {Array.isArray(summary.tags) && summary.tags.length > 0 && (
+            {Array.isArray(summary?.tags) && summary.tags.length > 0 && (
               <div style={{ marginTop: 6 }}>
                 {summary.tags.slice(0, 5).map((tag) => (
                   <span key={tag} className="onjo-tag">{tag}</span>
@@ -1064,27 +1103,53 @@ const SummaryView = () => {
           </div>
 
           <div className="summary-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {affiliateUrl && affiliateLabel && (
-              <a
-                className={`affiliate-btn ${affiliateType ? `affiliate-${affiliateType}` : ''}`}
-                href={affiliateUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  background: T.accent,
-                  color: '#fff',
-                  borderRadius: 4,
-                  padding: '7px 16px',
-                  fontFamily: '"Times New Roman", Times, serif',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  textDecoration: 'none',
-                  letterSpacing: '0.03em',
-                }}
-              >
-                {affiliateLabel}
-              </a>
-            )}
+            {(() => {
+              let affiliateUrl = null, affiliateLabel = null, affiliateType = null;
+              const rawAffiliate = summary?.affiliate_link ?? null;
+              if (rawAffiliate) {
+                try {
+                  if (typeof rawAffiliate === 'string') {
+                    const parts = rawAffiliate.split('|', 2).map(p => (p || '').trim());
+                    if (parts.length === 2 && parts[1]) { affiliateType = (parts[0] || '').toLowerCase(); affiliateUrl = parts[1]; }
+                    else { affiliateType = 'book'; affiliateUrl = rawAffiliate.trim(); }
+                  } else if (typeof rawAffiliate === 'object' && rawAffiliate !== null) {
+                    if (rawAffiliate.url) { affiliateUrl = String(rawAffiliate.url); affiliateType = (rawAffiliate.type || 'book').toLowerCase(); }
+                    else if (rawAffiliate.link) { affiliateUrl = String(rawAffiliate.link); affiliateType = (rawAffiliate.type || 'book').toLowerCase(); }
+                  }
+                } catch (e) {
+                  try { affiliateUrl = String(rawAffiliate); affiliateType = 'book'; } catch (ee) { affiliateUrl = null; affiliateType = null; }
+                }
+              }
+              if (affiliateUrl) {
+                affiliateLabel = affiliateType === 'pdf' ? 'Get PDF' : (affiliateType === 'app' ? 'Open App' : 'Get Book');
+              }
+              return affiliateUrl && affiliateLabel ? (
+                <a
+                  className={`affiliate-btn ${affiliateType ? `affiliate-${affiliateType}` : ''}`}
+                  href={affiliateUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    background: T.accent,
+                    color: '#fff',
+                    borderRadius: 4,
+                    padding: '7px 16px',
+                    fontFamily: '"Times New Roman", Times, serif',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    textDecoration: 'none',
+                    letterSpacing: '0.03em',
+                  }}
+                >
+                  {affiliateLabel}
+                </a>
+              ) : null;
+            })()}
+
+            <button className="hf-btn share-btn" type="button" onClick={handleShare} title="Share" aria-label="Share this content">
+              <FaShareAlt />
+            </button>
+
             {ownerId && currentUserId && ownerId === currentUserId && (
               <button
                 className="hf-btn"
@@ -1116,7 +1181,10 @@ const SummaryView = () => {
             </div>
             <div className="rating-block" title={`Average rating ${avgRating || 0}`}>
               <div className="rating-stars">{renderStars('md')}</div>
-              <div className="avg-text" style={{ color: T.accent, fontFamily: '"Times New Roman", Times, serif', fontWeight: 700 }}>
+              <div
+                className="avg-text"
+                style={{ color: T.accent, fontFamily: '"Times New Roman", Times, serif', fontWeight: 700 }}
+              >
                 {avgRating ? Number(avgRating).toFixed(1) : '0.0'}
               </div>
             </div>
@@ -1124,45 +1192,47 @@ const SummaryView = () => {
         </header>
 
         {/* ── READING TOOLBAR ── */}
-        <div className="onjo-reading-toolbar">
-          {/* Theme toggle */}
-          <button
-            className="onjo-theme-btn"
-            onClick={() => setTheme((t) => (t === 'white' ? 'brown' : 'white'))}
-            aria-label="Toggle reading theme"
-          >
-            {theme === 'white' ? '☾ Night' : '☀ Day'}
-          </button>
+        {!showLoading && (
+          <div className="onjo-reading-toolbar">
+            {/* Theme toggle */}
+            <button
+              className="onjo-theme-btn"
+              onClick={() => setTheme(t => (t === 'white' ? 'brown' : 'white'))}
+              aria-label="Toggle reading theme"
+            >
+              {theme === 'white' ? '☾ Night' : '☀ Day'}
+            </button>
 
-          {/* Font size */}
-          <div className="onjo-font-ctrl">
-            <button
-              onClick={() => setFontSize((s) => Math.max(13, s - 1))}
-              aria-label="Decrease font size"
-              title="Smaller text"
-            >
-              A−
-            </button>
-            <span>{fontSize}px</span>
-            <button
-              onClick={() => setFontSize((s) => Math.min(28, s + 1))}
-              aria-label="Increase font size"
-              title="Larger text"
-            >
-              A+
-            </button>
+            {/* Font size */}
+            <div className="onjo-font-ctrl">
+              <button
+                onClick={() => setFontSize(s => Math.max(13, s - 1))}
+                aria-label="Decrease font size"
+                title="Smaller text"
+              >
+                A−
+              </button>
+              <span>{fontSize}px</span>
+              <button
+                onClick={() => setFontSize(s => Math.min(28, s + 1))}
+                aria-label="Increase font size"
+                title="Larger text"
+              >
+                A+
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── YOUTUBE EMBED ── */}
-        {youtubeId && (
+        {!showLoading && extractYouTubeId(summary?.youtube_url) && (
           <div style={{ maxWidth: 820, margin: '16px auto', padding: '0 20px' }}>
             <div className="youtube-embed" style={{ marginBottom: 12 }}>
               <div className="embed-inner">
                 <iframe
                   className="youtube-iframe"
                   title="YouTube clip"
-                  src={`https://www.youtube-nocookie.com/embed/${youtubeId}`}
+                  src={`https://www.youtube-nocookie.com/embed/${extractYouTubeId(summary?.youtube_url)}`}
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
@@ -1174,11 +1244,61 @@ const SummaryView = () => {
 
         {/* ── ARTICLE BODY ── */}
         <div className="onjo-article-body-wrap" style={{ maxWidth: 820, margin: '20px auto 32px', padding: '0 20px' }}>
-          <article
-            className="summary-body onjo-article-body"
-            style={articleBodyStyle}
-            dangerouslySetInnerHTML={{ __html: processedSummary }}
-          />
+          {showLoading ? (
+            <div style={articleBodyStyle}>
+              <InlineLoader label="Loading content" />
+            </div>
+          ) : showNotFound ? (
+            <div style={{ ...articleBodyStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: T.muted, textAlign: 'center', padding: '40px 32px' }}>
+              <div style={{ fontSize: 42, marginBottom: 16, opacity: 0.7 }}>📖</div>
+              <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 10, color: T.text, fontFamily: '"Times New Roman", Times, serif' }}>Content Under Development</div>
+              <div style={{ fontSize: 15, lineHeight: 1.6, color: T.muted, marginBottom: 6, maxWidth: 480, fontFamily: '"Times New Roman", Times, serif' }}>
+                This resource is being carefully curated to ensure the highest quality insights.
+              </div>
+              <div style={{ fontSize: 14, lineHeight: 1.6, color: T.muted, marginBottom: 6, maxWidth: 460, fontFamily: '"Times New Roman", Times, serif' }}>
+                We prioritize depth and accuracy over speed.
+              </div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={handleBackToArticle}
+                  className="hf-btn"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: 15, fontWeight: 500, backgroundColor: T.accent, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', transition: 'all 0.2s', fontFamily: '"Times New Roman", Times, serif' }}
+                >
+                  <FaArrowLeft /> Back to Article
+                </button>
+              </div>
+              <div style={{ fontSize: 14, lineHeight: 1.6, color: T.accent, fontWeight: 700, marginTop: 16, marginBottom: 24, maxWidth: 460, fontFamily: '"Times New Roman", Times, serif' }}>
+                Explore related content below while we expand our library.
+              </div>
+            </div>
+          ) : (
+            // ── Segmented article render with inline ads (identical logic to File 3) ──
+            <article
+              className="summary-body onjo-article-body"
+              style={articleBodyStyle}
+              onClick={onArticleClick}
+            >
+              {articleSegments.map((segment, idx) => {
+                if (segment.type === 'ad') {
+                  const workbook = slotWorkbooks[segment.adIndex - 1] ?? null;
+                  if (!workbook) return null;
+                  return (
+                    <AdSlot
+                      key={`ad-${idx}`}
+                      index={segment.adIndex}
+                      workbook={workbook}
+                    />
+                  );
+                }
+                return (
+                  <div
+                    key={`para-${idx}`}
+                    dangerouslySetInnerHTML={{ __html: segment.content }}
+                  />
+                );
+              })}
+            </article>
+          )}
         </div>
 
         {/* ── RECOMMENDATIONS ── */}
@@ -1188,9 +1308,10 @@ const SummaryView = () => {
             items={recommendedContent}
             loading={isRecommending}
             skeletonCount={4}
-            viewAllLink={viewAllLinkForTags}
+            tag={summary?.tags && summary.tags.length > 0 ? summary.tags[0] : null}
+            sortKey="views"
           >
-            {recommendedContent.map((item) => (
+            {recommendedContent.map(item => (
               <BookSummaryCard key={String(item.id || item.slug)} summary={item} />
             ))}
           </HorizontalCarousel>
@@ -1205,26 +1326,31 @@ const SummaryView = () => {
         {recError && (
           <div className="rec-error" style={{ padding: '12px 16px', color: '#b45309' }}>
             {recError}{' '}
-            <button
-              onClick={() => {
-                if (Array.isArray(summary?.tags) && summary.tags.length > 0) {
-                  fetchRecommendedByTags(summary.tags, 10, summary.id);
-                } else if (summary.category) {
-                  fetchRecommendedByCategory(summary.category, 10, summary.id);
-                }
-              }}
-            >
-              Retry
-            </button>
+            <button onClick={() => {
+              if (Array.isArray(summary?.tags) && summary.tags.length > 0) fetchRecommendedByTags(summary.tags, 10, summary.id);
+              else if (summary?.category) fetchRecommendedByCategory(summary.category, 10, summary.id);
+            }}>Retry</button>
           </div>
         )}
 
         {/* ── COMMENTS ── */}
-        <section className="summary-comments" style={{ maxWidth: 820, margin: '0 auto', padding: '0 20px 40px' }}>
-          <h3 style={{ fontFamily: '"Times New Roman", Times, serif', color: T.text, borderBottom: `1px solid ${T.border}`, paddingBottom: 8, marginBottom: 20 }}>
+        <section
+          className="summary-comments"
+          style={{ maxWidth: 820, margin: '0 auto', padding: '0 20px 40px' }}
+        >
+          <h3 style={{
+            fontFamily: '"Times New Roman", Times, serif',
+            color: T.text,
+            borderBottom: `1px solid ${T.border}`,
+            paddingBottom: 8,
+            marginBottom: 20,
+          }}>
             Comments
           </h3>
-          <CommentsSection postId={summary.id} />
+          {summary?.id
+            ? <CommentsSection postId={summary.id} />
+            : <div style={{ color: T.muted, fontFamily: '"Times New Roman", Times, serif' }}>Comments will appear once the content loads.</div>
+          }
         </section>
 
         {showEdit && (
