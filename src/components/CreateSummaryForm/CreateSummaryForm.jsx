@@ -1,5 +1,15 @@
 // src/components/CreateSummaryForm/CreateSummaryForm.jsx
-// ONJO Reviews — adapted from OGONJO CreateSummaryForm
+// ONJO Reviews — with Bulk Article Editor integrated
+//
+// MODAL CLOSE RULES (enforced here):
+//   Single mode  — Save Draft  : toast only, modal stays open ✅
+//   Single mode  — Publish     : modal closes ✅
+//   Single mode  — Cancel / X  : modal closes ✅
+//   Bulk mode    — per-article : modal stays open ✅
+//   Bulk mode    — Save All    : modal closes after all done ✅
+//   Bulk mode    — Publish All : modal closes after all done ✅
+//   Bulk mode    — Cancel / X  : modal closes ✅
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { supabase } from "../../supabase/supabaseClient";
 import ReactQuill from "react-quill";
@@ -7,6 +17,7 @@ import Quill from "quill";
 import slugify from "slugify";
 import "quill/dist/quill.snow.css";
 import "./CreateSummaryForm.css";
+import BulkArticleEditor from "./BulkArticleEditor";
 
 /* ── Quill clipboard patch ───────────────────────────────── */
 const Clipboard = Quill.import("modules/clipboard");
@@ -34,26 +45,12 @@ try { const icons = Quill.import("ui/icons"); icons.internalLink = '<svg viewBox
 
 /* ── Constants ───────────────────────────────────────────── */
 const REAL_CATEGORIES = [
-  "Kitchen & Cooking",
-  "Home & Garden",
-  "Electronics & Tech",
-  "Health & Fitness",
-  "Health & Wellness",
-  "Beauty & Personal Care",
-  "Baby & Kids",
-  "Sports & Outdoors",
-  "Pet Supplies",
-  "Automotive",
-  "Office & Stationery",
-  "Finance & Money Management",
-  "Technology & Smart Devices",
-  "Travel Essentials & Adventure",
-  "Education & Learning Tools",
-  "DIY & Home Projects",
-  "Lifestyle & Personal Growth",
-  "Business & Entrepreneurship Tools",
-  "Parenting & Family Life",
-  "Cooking & Recipe Resources",
+  "Kitchen & Cooking","Home & Garden","Electronics & Tech","Health & Fitness",
+  "Health & Wellness","Beauty & Personal Care","Baby & Kids","Sports & Outdoors",
+  "Pet Supplies","Automotive","Office & Stationery","Finance & Money Management",
+  "Technology & Smart Devices","Travel Essentials & Adventure","Education & Learning Tools",
+  "DIY & Home Projects","Lifestyle & Personal Growth","Business & Entrepreneurship Tools",
+  "Parenting & Family Life","Cooking & Recipe Resources",
 ];
 
 const DRAFT_SENTINEL = "__DRAFT__";
@@ -95,8 +92,26 @@ const Toast = ({ message, type = "success", onDone }) => {
   );
 };
 
+/* ── Mode Toggle ─────────────────────────────────────────── */
+const ModeToggle = ({ mode, onChange }) => (
+  <div style={{ display:"flex", background:"#f3f4f6", borderRadius:8, padding:3, gap:3, border:"1px solid #e5e7eb" }}>
+    {[
+      { key: "single", label: "✏️ Single Article" },
+      { key: "bulk",   label: "📋 Bulk Import" },
+    ].map(({ key, label }) => (
+      <button key={key} type="button" onClick={() => onChange(key)} style={{
+        padding: "6px 18px", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 600,
+        cursor: "pointer", transition: "all 0.15s",
+        background: mode === key ? "#fff" : "transparent",
+        color:      mode === key ? "#111" : "#6b7280",
+        boxShadow:  mode === key ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
+      }}>{label}</button>
+    ))}
+  </div>
+);
+
 /* ═══════════════════════════════════════════════════════════
-   OUTER WRAPPER — fetches full row if editing
+   OUTER WRAPPER
 ═══════════════════════════════════════════════════════════ */
 const CreateSummaryForm = ({ onClose, onNewSummary, editingSummary = null }) => {
   const [initLoading, setInitLoading] = useState(false);
@@ -129,7 +144,10 @@ const CreateSummaryForm = ({ onClose, onNewSummary, editingSummary = null }) => 
 ═══════════════════════════════════════════════════════════ */
 const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
 
-  /* ── Fields ──────────────────────────────────────────── */
+  const isEditing = !!editingSummary?.id;
+  const [mode, setMode] = useState("single");
+
+  /* ── Fields ── */
   const [title, setTitle]             = useState(editingSummary?.title || "");
   const [slug, setSlug]               = useState(editingSummary?.slug || "");
   const [author, setAuthor]           = useState(editingSummary?.author || "");
@@ -151,13 +169,13 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
     return r.includes("|") ? r.split("|")[0] : "buy";
   });
 
-  /* ── Draft / auto-save ───────────────────────────────── */
+  /* ── Draft / auto-save ── */
   const [draftId, setDraftId]               = useState(editingSummary?.id || null);
   const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
   const autoSaveTimer                       = useRef(null);
   const lastSnapshotRef                     = useRef(null);
 
-  /* ── UI state ────────────────────────────────────────── */
+  /* ── UI state ── */
   const [loading, setLoading]               = useState(false);
   const [draftSaving, setDraftSaving]       = useState(false);
   const [errorMsg, setErrorMsg]             = useState("");
@@ -166,8 +184,8 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
   const [deleteLoading, setDeleteLoading]   = useState(false);
   const [toast, setToast]                   = useState(null);
 
-  /* ── Quill / link modal ──────────────────────────────── */
-  const quillRef                          = useRef(null);
+  /* ── Quill / link modal ── */
+  const quillRef                        = useRef(null);
   const [showLinkModal, setShowLinkModal]   = useState(false);
   const [linkSearch, setLinkSearch]         = useState("");
   const [linkResults, setLinkResults]       = useState([]);
@@ -175,14 +193,13 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
 
   const isDraftMode = category === DRAFT_SENTINEL;
   const canPublish  = !isDraftMode;
-  const isEditing   = !!editingSummary?.id;
 
   const autoSaveLabel = {
     idle: "", saving: "💾 Saving draft…",
     saved: "✅ Draft saved", error: "⚠️ Auto-save failed",
   }[autoSaveStatus];
 
-  /* ── Slug from title ─────────────────────────────────── */
+  /* ── Slug from title ── */
   useEffect(() => {
     if (!isEditing && title?.trim())
       setSlug(slugify(title, { lower:true, strict:true, replacement:"-" }));
@@ -190,7 +207,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
       setSlug("");
   }, [title, isEditing]);
 
-  /* ── Quill modules ───────────────────────────────────── */
+  /* ── Quill modules ── */
   const quillModules = useMemo(() => ({
     toolbar: {
       container: [
@@ -221,7 +238,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
     "list","bullet","blockquote","code-block","link","image","table"
   ], []);
 
-  /* ── Internal link search ────────────────────────────── */
+  /* ── Internal link search ── */
   useEffect(() => {
     let cancelled = false;
     if (!linkSearch?.trim()) { setLinkResults([]); return; }
@@ -236,7 +253,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
     return () => { cancelled = true; };
   }, [linkSearch]);
 
-  /* ── Auto-save ───────────────────────────────────────── */
+  /* ── Auto-save ── */
   const buildSnapshot = useCallback(() =>
     JSON.stringify({ title, author, description, summaryText, category, imageUrl, affiliateLink, affiliateType, youtubeUrl, tags }),
     [title, author, description, summaryText, category, imageUrl, affiliateLink, affiliateType, youtubeUrl, tags]
@@ -312,7 +329,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
 
   useEffect(() => () => clearTimeout(autoSaveTimer.current), []);
 
-  /* ── Duplicate title check ───────────────────────────── */
+  /* ── Duplicate title check ── */
   const checkTitleExists = useCallback(async (t, excludeId = null) => {
     if (!t?.trim()) return { exists: false };
     try {
@@ -323,7 +340,11 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
     } catch { return { exists: false }; }
   }, []);
 
-  /* ── Save Draft ──────────────────────────────────────── */
+  /* ──────────────────────────────────────────────────────
+     SINGLE MODE: Save Draft
+     ✅ Shows toast, modal stays OPEN.
+     ✅ Never calls onClose().
+  ────────────────────────────────────────────────────── */
   const handleSaveDraft = useCallback(async () => {
     if (draftSaving) return;
     setTitleDupeWarning(""); setErrorMsg("");
@@ -350,16 +371,20 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
         setDraftId(ins.id);
       }
       if (typeof onNewSummary === "function") onNewSummary();
-      setToast({ message: "✅ Draft saved successfully", type: "success" });
-      setTimeout(() => { if (typeof onClose === "function") onClose(); }, 1200);
+      // ✅ Toast only — modal stays open
+      setToast({ message: "✅ Draft saved", type: "success" });
     } catch (err) {
       console.error("Save draft error:", err);
       setToast({ message: `❌ Could not save draft: ${err.message}`, type: "error" });
+    } finally {
       setDraftSaving(false);
     }
-  }, [draftSaving, title, author, description, summaryText, category, imageUrl, affiliateLink, affiliateType, youtubeUrl, tags, draftId, slug, checkTitleExists, buildPayload, onNewSummary, onClose]);
+  }, [draftSaving, title, author, description, summaryText, category, imageUrl, affiliateLink, affiliateType, youtubeUrl, tags, draftId, slug, checkTitleExists, buildPayload, onNewSummary]);
 
-  /* ── Publish ─────────────────────────────────────────── */
+  /* ──────────────────────────────────────────────────────
+     SINGLE MODE: Publish
+     ✅ Calls onClose() after success.
+  ────────────────────────────────────────────────────── */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg(""); setTitleDupeWarning("");
@@ -391,6 +416,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
       setLoading(false);
       if (error) { setErrorMsg(error.message || "Error publishing."); return; }
       if (typeof onNewSummary === "function") onNewSummary();
+      // ✅ Publish closes modal
       if (typeof onClose === "function") onClose();
     } catch (err) {
       console.error(err);
@@ -399,7 +425,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
     }
   };
 
-  /* ── Delete ──────────────────────────────────────────── */
+  /* ── Delete ── */
   const handleDelete = async () => {
     if (!draftId) return;
     setDeleteLoading(true);
@@ -415,7 +441,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
     finally { setDeleteLoading(false); }
   };
 
-  /* ── Auto-link helpers ───────────────────────────────── */
+  /* ── Auto-link helpers ── */
   const fetchTitleCandidates = async (text, limit=200) => { if (!text?.trim()) return []; try { const { data, error } = await supabase.from("book_summaries").select("id, title, slug, keywords").ilike("title", `%${text.trim()}%`).limit(limit); return error?[]:(data||[]); } catch { return []; } };
   const fetchKeywordRows = async (limit=1000) => { try { const { data, error } = await supabase.from("book_summaries").select("id, title, slug, keywords").not("keywords","is",null).limit(limit); return error?[]:(data||[]); } catch { return []; } };
   const wrapNodeInAnchor = (node, row) => { const href=toReviewHref(row); try { if (node.closest?.("a")) return false; const a=document.createElement("a"); a.setAttribute("data-summary-id",row.id); a.setAttribute("href",href); a.className="internal-summary-link"; node.parentNode&&node.parentNode.replaceChild(a,node); a.appendChild(node); return true; } catch (_) {} return false; };
@@ -426,7 +452,7 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
   const removeInternalLinksAndBold = () => { const editor=quillRef.current?.getEditor(); if(!editor)return; const as=Array.from(editor.root.querySelectorAll('a[data-summary-id]')); if(!as.length){alert("No internal links found.");return;}let r=0; as.forEach(a=>{try{const s=document.createElement("strong");s.textContent=(a.textContent||"").trim();a.parentNode?.replaceChild(s,a);r++;}catch(_){}});try{setSummaryText(editor.root.innerHTML);}catch(_){}alert(`Removed ${r} link(s).`); };
   const insertInternalLink = (item) => { const editor=quillRef.current?.getEditor(); if(!editor)return; const range=selectedRange||editor.getSelection(); if(!range){alert("Selection lost.");setShowLinkModal(false);return;}let sel="";try{if(range.length)sel=editor.getText(range.index,range.length).trim();}catch(_){}if(!sel)sel=item.title||"link";const href=toReviewHref(item);try{editor.deleteText(range.index,range.length);editor.insertText(range.index,sel,{link:href},"user");}catch(_){}try{setSummaryText(editor.root.innerHTML);}catch(_){}setShowLinkModal(false);setLinkSearch("");setLinkResults([]);setSelectedRange(null); };
 
-  /* ── Render ──────────────────────────────────────────── */
+  /* ── Render ── */
   return (
     <>
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
@@ -436,17 +462,18 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
           <button className="close-button" onClick={onClose}>&times;</button>
 
           {/* Header */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 16 }}>
             <h2 style={{ margin:0 }}>
               {isEditing ? "Edit Review" : "Create New Review"}
             </h2>
-            <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-              {autoSaveLabel && (
+            <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+              {autoSaveLabel && mode === "single" && (
                 <span style={{ fontSize:13, color: autoSaveStatus==="error"?"#ef4444":"#6b7280" }}>
                   {autoSaveLabel}
                 </span>
               )}
-              {isDraftMode && (
+              {!isEditing && <ModeToggle mode={mode} onChange={setMode} />}
+              {isDraftMode && mode === "single" && (
                 <span style={{ background:"#fef3c7", color:"#92400e", border:"1px solid #fbbf24", borderRadius:20, padding:"2px 10px", fontSize:12, fontWeight:600 }}>
                   DRAFT
                 </span>
@@ -454,169 +481,182 @@ const CreateSummaryInner = ({ onClose, onNewSummary, editingSummary }) => {
             </div>
           </div>
 
-          {errorMsg && <div className="form-error">{errorMsg}</div>}
-          {titleDupeWarning && (
-            <div className="form-error" style={{ background:"#fef3c7", borderColor:"#fbbf24", color:"#92400e" }}>
-              {titleDupeWarning}
-            </div>
+          {/* ══ BULK MODE ══
+               Pass onClose so bulk-all actions can close the modal.
+               Per-article saves inside BulkArticleEditor never call onClose.
+          ══ */}
+          {mode === "bulk" && (
+            <BulkArticleEditor onNewSummary={onNewSummary} onClose={onClose} />
           )}
 
-          <form onSubmit={handleSubmit} className="summary-form">
-
-            <label>Title</label>
-            <input type="text" value={title}
-              onChange={e=>{setTitle(e.target.value);setTitleDupeWarning("");setErrorMsg("");}} required />
-            {slug && <small className="slug-preview">Slug: <code>/review/{slug}</code></small>}
-
-            <label>Reviewer / Author</label>
-            <input type="text" value={author} onChange={e=>setAuthor(e.target.value)} required />
-
-            <label>
-              Category
-              <span style={{ color:"#6b7280", fontWeight:400, fontSize:12, marginLeft:6 }}>
-                — select a category to enable publishing
-              </span>
-            </label>
-            <select value={category} onChange={e=>setCategory(e.target.value)}>
-              <option value={DRAFT_SENTINEL}>📝 Keep as Draft (auto-save)</option>
-              {REAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-
-            <label>Description (short preview for feeds)</label>
-            <textarea value={description} onChange={e=>setDescription(e.target.value)}
-              placeholder="Short description (150-250 chars)" maxLength={300} rows={3} />
-
-            <label>Product Image URL</label>
-            <input type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)}
-              placeholder="https://example.com/product.jpg" />
-
-            <label>Affiliate / Buy Link</label>
-            <div style={{ display:"flex", gap:8, alignItems:"center", width:"100%", marginBottom:6 }}>
-              <input type="url" value={affiliateLink} onChange={e=>setAffiliateLink(e.target.value)}
-                placeholder="https://..." style={{ flex:"0 0 68%", minWidth:0, padding:"8px 10px", boxSizing:"border-box" }} />
-              <select value={affiliateType} onChange={e=>setAffiliateType(e.target.value)}
-                style={{ flex:"0 0 30%", padding:"8px 6px", boxSizing:"border-box" }}>
-                <option value="buy">Buy Now</option>
-                <option value="get">Get Product</option>
-                <option value="check">Check Price</option>
-                <option value="app">Open App</option>
-                <option value="try">Try Free</option>
-              </select>
-            </div>
-
-            <label>YouTube URL</label>
-            <input type="url" value={youtubeUrl} onChange={e=>setYoutubeUrl(e.target.value)}
-              placeholder="https://youtube.com/..." />
-
-            <label>Tags (comma separated)</label>
-            <input type="text" value={tags} onChange={e=>setTags(e.target.value)}
-              placeholder="tech, gadgets, productivity" />
-
-            <label>Review Content</label>
-            <div style={{ display:"flex", gap:8, marginBottom:8, flexWrap:"wrap" }}>
-              <button type="button" className="hf-btn" onClick={autoLinkBoldTextBySlug}>🔗 Slug-link</button>
-              <button type="button" className="hf-btn" onClick={autoLinkBoldTextExact}>🎯 Exact auto-link</button>
-              <button type="button" className="hf-btn" onClick={autoLinkBoldTextKeywords}>🧠 Keyword auto-link</button>
-              <button type="button" className="hf-btn" onClick={removeInternalLinksAndBold}>✂️ Remove links</button>
-              <button type="button" className="hf-btn" onClick={()=>setShowLinkModal(true)}>🔎 Manual link</button>
-            </div>
-            <div className="quill-container">
-              <ReactQuill
-                ref={quillRef}
-                value={summaryText}
-                onChange={setSummaryText}
-                modules={quillModules}
-                formats={quillFormats}
-                theme="snow"
-              />
-            </div>
-
-            {/* Action bar */}
-            <div style={{ display:"flex", gap:10, marginTop:16, alignItems:"center", flexWrap:"wrap" }}>
-              <button type="button" onClick={handleSaveDraft} disabled={draftSaving || loading}
-                style={{
-                  background: draftSaving ? "#e5e7eb" : "#f3f4f6",
-                  color: draftSaving ? "#9ca3af" : "#374151",
-                  border:"1px solid #d1d5db", borderRadius:6, padding:"8px 18px",
-                  cursor: draftSaving ? "not-allowed" : "pointer", fontWeight:500, minWidth:130,
-                }}>
-                {draftSaving ? "💾 Saving…" : "💾 Save Draft"}
-              </button>
-
-              <button type="submit" disabled={loading || !canPublish || draftSaving}
-                title={!canPublish ? "Select a category above to publish" : ""}
-                style={{
-                  background: canPublish ? "#2563eb" : "#9ca3af",
-                  color:"#fff", border:"none", borderRadius:6, padding:"8px 22px",
-                  cursor: canPublish ? "pointer" : "not-allowed", fontWeight:600,
-                }}>
-                {loading ? "Publishing…" : (isEditing ? "🚀 Save & Publish" : "🚀 Publish")}
-              </button>
-
-              {!canPublish && (
-                <span style={{ fontSize:12, color:"#9ca3af" }}>Select a category to publish</span>
-              )}
-
-              <button type="button" onClick={onClose} disabled={loading || draftSaving}
-                style={{ background:"#f3f4f6", color:"#374151", border:"1px solid #d1d5db", borderRadius:6, padding:"8px 16px", cursor:"pointer" }}>
-                Cancel
-              </button>
-
-              {draftId && (
-                <button type="button" onClick={() => setShowDeleteConfirm(true)}
-                  style={{ marginLeft:"auto", background:"#fff", color:"#dc2626", border:"1.5px solid #fca5a5", borderRadius:6, padding:"8px 16px", cursor:"pointer", fontWeight:500 }}>
-                  🗑 Delete
-                </button>
-              )}
-            </div>
-          </form>
-
-          {/* Internal Link Modal */}
-          {showLinkModal && (
-            <div className="internal-link-modal" onClick={()=>{setShowLinkModal(false);setLinkSearch("");setLinkResults([]);}}>
-              <div className="internal-link-box" onClick={e=>e.stopPropagation()}>
-                <h4>Link to review</h4>
-                <input value={linkSearch} onChange={e=>setLinkSearch(e.target.value)}
-                  placeholder="Search reviews by title…" autoFocus />
-                <div style={{ maxHeight:260, overflowY:"auto", marginTop:8 }}>
-                  {linkResults.length===0 && <div style={{ padding:8, color:"#666" }}>No results</div>}
-                  <ul style={{ listStyle:"none", padding:0, margin:0 }}>
-                    {linkResults.map(r=>(
-                      <li key={r.id}>
-                        <button type="button" className="hf-btn"
-                          onClick={()=>insertInternalLink(r)}
-                          style={{ width:"100%", textAlign:"left", marginBottom:6 }}>{r.title}</button>
-                      </li>
-                    ))}
-                  </ul>
+          {/* ══ SINGLE MODE ══ */}
+          {mode === "single" && (
+            <>
+              {errorMsg && <div className="form-error">{errorMsg}</div>}
+              {titleDupeWarning && (
+                <div className="form-error" style={{ background:"#fef3c7", borderColor:"#fbbf24", color:"#92400e" }}>
+                  {titleDupeWarning}
                 </div>
-                <button className="hf-btn" style={{ marginTop:10 }}
-                  onClick={()=>{setShowLinkModal(false);setLinkSearch("");setLinkResults([]);}}>Cancel</button>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Delete Confirmation */}
-          {showDeleteConfirm && (
-            <div className="internal-link-modal" onClick={()=>!deleteLoading&&setShowDeleteConfirm(false)} style={{ zIndex:9999 }}>
-              <div className="internal-link-box" onClick={e=>e.stopPropagation()} style={{ maxWidth:420, textAlign:"center" }}>
-                <div style={{ fontSize:44, marginBottom:8 }}>⚠️</div>
-                <h3 style={{ margin:"0 0 8px", color:"#dc2626" }}>Delete this review?</h3>
-                <p style={{ color:"#6b7280", marginBottom:20, fontSize:14 }}>
-                  <strong>"{title || "this review"}"</strong> will be permanently deleted and cannot be undone.
-                </p>
-                <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
-                  <button type="button" onClick={()=>setShowDeleteConfirm(false)} disabled={deleteLoading}
-                    style={{ padding:"9px 22px", borderRadius:6, border:"1px solid #d1d5db", background:"#f9fafb", cursor:"pointer", fontWeight:500 }}>
+              <form onSubmit={handleSubmit} className="summary-form">
+
+                <label>Title</label>
+                <input type="text" value={title}
+                  onChange={e=>{setTitle(e.target.value);setTitleDupeWarning("");setErrorMsg("");}} required />
+                {slug && <small className="slug-preview">Slug: <code>/review/{slug}</code></small>}
+
+                <label>Reviewer / Author</label>
+                <input type="text" value={author} onChange={e=>setAuthor(e.target.value)} required />
+
+                <label>
+                  Category
+                  <span style={{ color:"#6b7280", fontWeight:400, fontSize:12, marginLeft:6 }}>
+                    — select a category to enable publishing
+                  </span>
+                </label>
+                <select value={category} onChange={e=>setCategory(e.target.value)}>
+                  <option value={DRAFT_SENTINEL}>📝 Keep as Draft (auto-save)</option>
+                  {REAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+
+                <label>Description (short preview for feeds)</label>
+                <textarea value={description} onChange={e=>setDescription(e.target.value)}
+                  placeholder="Short description (150-250 chars)" maxLength={300} rows={3} />
+
+                <label>Product Image URL</label>
+                <input type="url" value={imageUrl} onChange={e=>setImageUrl(e.target.value)}
+                  placeholder="https://example.com/product.jpg" />
+
+                <label>Affiliate / Buy Link</label>
+                <div style={{ display:"flex", gap:8, alignItems:"center", width:"100%", marginBottom:6 }}>
+                  <input type="url" value={affiliateLink} onChange={e=>setAffiliateLink(e.target.value)}
+                    placeholder="https://..." style={{ flex:"0 0 68%", minWidth:0, padding:"8px 10px", boxSizing:"border-box" }} />
+                  <select value={affiliateType} onChange={e=>setAffiliateType(e.target.value)}
+                    style={{ flex:"0 0 30%", padding:"8px 6px", boxSizing:"border-box" }}>
+                    <option value="buy">Buy Now</option>
+                    <option value="get">Get Product</option>
+                    <option value="check">Check Price</option>
+                    <option value="app">Open App</option>
+                    <option value="try">Try Free</option>
+                  </select>
+                </div>
+
+                <label>YouTube URL</label>
+                <input type="url" value={youtubeUrl} onChange={e=>setYoutubeUrl(e.target.value)}
+                  placeholder="https://youtube.com/..." />
+
+                <label>Tags (comma separated)</label>
+                <input type="text" value={tags} onChange={e=>setTags(e.target.value)}
+                  placeholder="tech, gadgets, productivity" />
+
+                <label>Review Content</label>
+                <div style={{ display:"flex", gap:8, marginBottom:8, flexWrap:"wrap" }}>
+                  <button type="button" className="hf-btn" onClick={autoLinkBoldTextBySlug}>🔗 Slug-link</button>
+                  <button type="button" className="hf-btn" onClick={autoLinkBoldTextExact}>🎯 Exact auto-link</button>
+                  <button type="button" className="hf-btn" onClick={autoLinkBoldTextKeywords}>🧠 Keyword auto-link</button>
+                  <button type="button" className="hf-btn" onClick={removeInternalLinksAndBold}>✂️ Remove links</button>
+                  <button type="button" className="hf-btn" onClick={()=>setShowLinkModal(true)}>🔎 Manual link</button>
+                </div>
+                <div className="quill-container">
+                  <ReactQuill
+                    ref={quillRef}
+                    value={summaryText}
+                    onChange={setSummaryText}
+                    modules={quillModules}
+                    formats={quillFormats}
+                    theme="snow"
+                  />
+                </div>
+
+                {/* Action bar */}
+                <div style={{ display:"flex", gap:10, marginTop:16, alignItems:"center", flexWrap:"wrap" }}>
+                  <button type="button" onClick={handleSaveDraft} disabled={draftSaving || loading}
+                    style={{
+                      background: draftSaving ? "#e5e7eb" : "#f3f4f6",
+                      color: draftSaving ? "#9ca3af" : "#374151",
+                      border:"1px solid #d1d5db", borderRadius:6, padding:"8px 18px",
+                      cursor: draftSaving ? "not-allowed" : "pointer", fontWeight:500, minWidth:130,
+                    }}>
+                    {draftSaving ? "💾 Saving…" : "💾 Save Draft"}
+                  </button>
+
+                  <button type="submit" disabled={loading || !canPublish || draftSaving}
+                    title={!canPublish ? "Select a category above to publish" : ""}
+                    style={{
+                      background: canPublish ? "#2563eb" : "#9ca3af",
+                      color:"#fff", border:"none", borderRadius:6, padding:"8px 22px",
+                      cursor: canPublish ? "pointer" : "not-allowed", fontWeight:600,
+                    }}>
+                    {loading ? "Publishing…" : (isEditing ? "🚀 Save & Publish" : "🚀 Publish")}
+                  </button>
+
+                  {!canPublish && (
+                    <span style={{ fontSize:12, color:"#9ca3af" }}>Select a category to publish</span>
+                  )}
+
+                  <button type="button" onClick={onClose} disabled={loading || draftSaving}
+                    style={{ background:"#f3f4f6", color:"#374151", border:"1px solid #d1d5db", borderRadius:6, padding:"8px 16px", cursor:"pointer" }}>
                     Cancel
                   </button>
-                  <button type="button" onClick={handleDelete} disabled={deleteLoading}
-                    style={{ padding:"9px 22px", borderRadius:6, border:"none", background:"#dc2626", color:"#fff", cursor:"pointer", fontWeight:600 }}>
-                    {deleteLoading ? "Deleting…" : "Yes, Delete"}
-                  </button>
+
+                  {draftId && (
+                    <button type="button" onClick={() => setShowDeleteConfirm(true)}
+                      style={{ marginLeft:"auto", background:"#fff", color:"#dc2626", border:"1.5px solid #fca5a5", borderRadius:6, padding:"8px 16px", cursor:"pointer", fontWeight:500 }}>
+                      🗑 Delete
+                    </button>
+                  )}
                 </div>
-              </div>
-            </div>
+              </form>
+
+              {/* Internal Link Modal */}
+              {showLinkModal && (
+                <div className="internal-link-modal" onClick={()=>{setShowLinkModal(false);setLinkSearch("");setLinkResults([]);}}>
+                  <div className="internal-link-box" onClick={e=>e.stopPropagation()}>
+                    <h4>Link to review</h4>
+                    <input value={linkSearch} onChange={e=>setLinkSearch(e.target.value)}
+                      placeholder="Search reviews by title…" autoFocus />
+                    <div style={{ maxHeight:260, overflowY:"auto", marginTop:8 }}>
+                      {linkResults.length===0 && <div style={{ padding:8, color:"#666" }}>No results</div>}
+                      <ul style={{ listStyle:"none", padding:0, margin:0 }}>
+                        {linkResults.map(r=>(
+                          <li key={r.id}>
+                            <button type="button" className="hf-btn"
+                              onClick={()=>insertInternalLink(r)}
+                              style={{ width:"100%", textAlign:"left", marginBottom:6 }}>{r.title}</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <button className="hf-btn" style={{ marginTop:10 }}
+                      onClick={()=>{setShowLinkModal(false);setLinkSearch("");setLinkResults([]);}}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete Confirmation */}
+              {showDeleteConfirm && (
+                <div className="internal-link-modal" onClick={()=>!deleteLoading&&setShowDeleteConfirm(false)} style={{ zIndex:9999 }}>
+                  <div className="internal-link-box" onClick={e=>e.stopPropagation()} style={{ maxWidth:420, textAlign:"center" }}>
+                    <div style={{ fontSize:44, marginBottom:8 }}>⚠️</div>
+                    <h3 style={{ margin:"0 0 8px", color:"#dc2626" }}>Delete this review?</h3>
+                    <p style={{ color:"#6b7280", marginBottom:20, fontSize:14 }}>
+                      <strong>"{title || "this review"}"</strong> will be permanently deleted and cannot be undone.
+                    </p>
+                    <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
+                      <button type="button" onClick={()=>setShowDeleteConfirm(false)} disabled={deleteLoading}
+                        style={{ padding:"9px 22px", borderRadius:6, border:"1px solid #d1d5db", background:"#f9fafb", cursor:"pointer", fontWeight:500 }}>
+                        Cancel
+                      </button>
+                      <button type="button" onClick={handleDelete} disabled={deleteLoading}
+                        style={{ padding:"9px 22px", borderRadius:6, border:"none", background:"#dc2626", color:"#fff", cursor:"pointer", fontWeight:600 }}>
+                        {deleteLoading ? "Deleting…" : "Yes, Delete"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
