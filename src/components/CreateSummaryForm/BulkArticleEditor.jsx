@@ -1,15 +1,13 @@
 // src/components/CreateSummaryForm/BulkArticleEditor.jsx
-// ONJO Reviews — Bulk Article Editor v4
+// ONJO Reviews — Bulk Article Editor v5
 //
-// FIXES:
-//  1. Individual "Save Draft" / "Publish" in bulk mode NEVER closes the modal.
-//     The modal only closes when the parent explicitly calls onClose (e.g. after
-//     "Save All as Drafts" completes ALL articles, or the user hits Cancel/X).
-//     BulkArticleEditor never calls onClose itself.
-//  2. "Save All as Drafts" stale-closure bug fixed.
-//     onSaveDraft / onPublish now accept a plain article object instead of
-//     looking one up from `articles` state, so the bulk loop always passes
-//     fresh data and _draftId updates are threaded through correctly.
+// CHANGES FROM v4:
+//  1. Cover Image Prompt → Cover Image URL
+//     The parser now captures the URL from "Cover Image URL:" and
+//     drops it directly into the imageUrl field (Product Image URL input).
+//     If the value is not a valid https:// URL, it is silently ignored.
+//  2. Paste zone hint text updated to reflect the new field name.
+//  3. All other logic (stale-closure fix, modal-close fix) unchanged from v4.
 
 import React, { useState, useCallback, useRef } from "react";
 import { supabase } from "../../supabase/supabaseClient";
@@ -134,6 +132,7 @@ function parseOneArticle(text) {
   let title = "";
   let metaDescription = "";
   let tags = "";
+  let imageUrl = "";       // ← NEW: captured from "Cover Image URL:"
   let bodyLines = [];
   let inBody = false;
   let i = 0;
@@ -147,7 +146,17 @@ function parseOneArticle(text) {
       i++; continue;
     }
 
-    if (/^Cover Image Prompt:\s*/i.test(trimmed)) {
+    // ── Cover Image URL (v5) ─────────────────────────────
+    // Accepts both the old "Cover Image Prompt:" label (backwards-compat)
+    // and the new "Cover Image URL:" label.
+    // If the value starts with https://, store it as imageUrl.
+    // If it looks like a plain-text prompt (old format), discard silently.
+    if (/^Cover Image (URL|Prompt):\s*/i.test(trimmed)) {
+      const val = trimmed.replace(/^Cover Image (URL|Prompt):\s*/i, "").trim();
+      if (/^https?:\/\//i.test(val)) {
+        imageUrl = val;
+      }
+      // Either way, skip any continuation lines until the next labelled field
       i++;
       while (i < lines.length) {
         const next = lines[i].trim();
@@ -167,7 +176,7 @@ function parseOneArticle(text) {
       while (i < lines.length) {
         const next = lines[i].trim();
         if (
-          /^(SEO Title|Tags|Cover Image Prompt|##|Related Articles|Affiliate Disclosure):/i.test(next) ||
+          /^(SEO Title|Tags|Cover Image (URL|Prompt)|##|Related Articles|Affiliate Disclosure):/i.test(next) ||
           /^ARTICLE\s+\d+/i.test(next) ||
           next === ""
         ) break;
@@ -202,7 +211,7 @@ function parseOneArticle(text) {
     affiliateLink: "",
     affiliateType: "buy",
     youtubeUrl: "",
-    imageUrl: "",
+    imageUrl,              // ← populated from Cover Image URL if valid
     category: DRAFT_SENTINEL,
     _id: Math.random().toString(36).slice(2),
     _status: "idle",
@@ -405,6 +414,13 @@ const ArticleCard = ({ article, index, onUpdate, onSaveDraft, onPublish, onDelet
           {article.title?.trim() || <em style={{ color: "#9ca3af", fontWeight: 400 }}>No SEO title parsed</em>}
         </span>
 
+        {/* Image badge — shows when a URL was auto-parsed */}
+        {article.imageUrl && (
+          <span style={{ fontSize: 11, color: "#0369a1", background: "#e0f2fe", border: "1px solid #7dd3fc", padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>
+            🖼 Image
+          </span>
+        )}
+
         {s.label && (
           <span style={{ fontSize: 12, fontWeight: 600, color: s.color, background: s.bg, padding: "2px 10px", borderRadius: 20, flexShrink: 0 }}>
             {s.label}
@@ -491,10 +507,29 @@ const ArticleCard = ({ article, index, onUpdate, onSaveDraft, onPublish, onDelet
                 onChange={e => onUpdate(article._id, { youtubeUrl: e.target.value })}
                 placeholder="https://youtube.com/…" type="url" />
 
-              <label style={S.label}>Product Image URL</label>
+              <label style={S.label}>
+                Product Image URL
+                {article.imageUrl && (
+                  <span style={{ color: "#0369a1", fontSize: 11, fontWeight: 400, marginLeft: 6 }}>
+                    ✓ auto-filled from prompt
+                  </span>
+                )}
+              </label>
               <input style={S.input} value={article.imageUrl}
                 onChange={e => onUpdate(article._id, { imageUrl: e.target.value })}
                 placeholder="https://example.com/product.jpg" type="url" />
+
+              {/* Image preview — shows thumbnail if URL is present */}
+              {article.imageUrl && (
+                <div style={{ marginTop: 6 }}>
+                  <img
+                    src={article.imageUrl}
+                    alt="Product preview"
+                    style={{ width: "100%", maxHeight: 120, objectFit: "contain", borderRadius: 6, border: "1px solid #e5e7eb", background: "#f9fafb" }}
+                    onError={e => { e.target.style.display = "none"; }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -563,9 +598,6 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
   const [bulkWorking, setBulkWorking] = useState(false);
   const bottomRef = useRef(null);
 
-  /* ── articlesRef: always holds the latest articles array
-        Used by bulk loops to read fresh _draftId values
-        without triggering re-renders or stale closures.    */
   const articlesRef = useRef(articles);
   articlesRef.current = articles;
 
@@ -591,29 +623,16 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
     setParsing(false);
   }, [rawText]);
 
-  /* ──────────────────────────────────────────────────────
-     onSaveDraft(id)
-     - Marks article as "saving"
-     - Reads current article from state (via setArticles callback)
-     - Calls saveDraftCore with the live article object
-     - Updates state with result
-     - NEVER calls onClose
-  ────────────────────────────────────────────────────── */
   const onSaveDraft = useCallback(async (id) => {
-    // Grab the latest version of this article from the ref
     const art = articlesRef.current.find(a => a._id === id);
     if (!art) return;
-
     setArticles(prev => prev.map(a => a._id === id ? { ...a, _status: "saving" } : a));
-
     const result = await saveDraftCore(art);
-
     if (result.ok) {
       setArticles(prev => prev.map(a =>
         a._id === id ? { ...a, _status: "saved", _draftId: result.draftId } : a
       ));
       if (typeof onNewSummary === "function") onNewSummary();
-      // ✅ No onClose() call here — modal stays open
     } else {
       setArticles(prev => prev.map(a =>
         a._id === id ? { ...a, _status: "error", _error: result.error } : a
@@ -621,25 +640,16 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
     }
   }, [onNewSummary]);
 
-  /* ──────────────────────────────────────────────────────
-     onPublish(id)
-     - Same pattern as onSaveDraft
-     - NEVER calls onClose
-  ────────────────────────────────────────────────────── */
   const onPublish = useCallback(async (id) => {
     const art = articlesRef.current.find(a => a._id === id);
     if (!art) return;
-
     setArticles(prev => prev.map(a => a._id === id ? { ...a, _status: "saving" } : a));
-
     const result = await publishCore(art);
-
     if (result.ok) {
       setArticles(prev => prev.map(a =>
         a._id === id ? { ...a, _status: "published", _draftId: result.draftId } : a
       ));
       if (typeof onNewSummary === "function") onNewSummary();
-      // ✅ No onClose() call here — modal stays open
     } else {
       setArticles(prev => prev.map(a =>
         a._id === id ? { ...a, _status: "error", _error: result.error } : a
@@ -647,7 +657,6 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
     }
   }, [onNewSummary]);
 
-  /* ── Delete ── */
   const onDelete = useCallback(async (id) => {
     const art = articlesRef.current.find(a => a._id === id);
     if (!art) return;
@@ -664,34 +673,16 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
     } catch (err) { alert("Delete failed: " + err.message); }
   }, [onNewSummary]);
 
-  /* ──────────────────────────────────────────────────────
-     handleSaveAllDrafts
-     FIX: We iterate over articlesRef.current so each
-     iteration reads the LATEST _draftId written by the
-     previous iteration, eliminating the stale-closure
-     duplicate-insert / lost-save bug.
-
-     After ALL articles finish, onClose() is called so
-     the modal closes once — not per-article.
-  ────────────────────────────────────────────────────── */
   const handleSaveAllDrafts = useCallback(async () => {
     const pending = articlesRef.current.filter(a => ["idle", "error"].includes(a._status));
     if (!pending.length) { setBulkStatus("Nothing new to save."); return; }
-
     setBulkWorking(true);
     setBulkStatus(`Saving ${pending.length} draft${pending.length > 1 ? "s" : ""}…`);
-
-    let saved = 0;
-    let failed = 0;
-
+    let saved = 0; let failed = 0;
     for (const snapArt of pending) {
-      // Read the FRESHEST version from the ref before each save
       const art = articlesRef.current.find(a => a._id === snapArt._id) || snapArt;
-
       setArticles(prev => prev.map(a => a._id === art._id ? { ...a, _status: "saving" } : a));
-
       const result = await saveDraftCore(art);
-
       if (result.ok) {
         setArticles(prev => prev.map(a =>
           a._id === art._id ? { ...a, _status: "saved", _draftId: result.draftId } : a
@@ -703,49 +694,29 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
         ));
         failed++;
       }
-
       setBulkStatus(`Saved ${saved} / ${pending.length}…`);
     }
-
     if (typeof onNewSummary === "function") onNewSummary();
-
-    const summary = failed > 0
+    setBulkStatus(failed > 0
       ? `✅ ${saved} saved — ⚠️ ${failed} failed (check errors above)`
-      : `✅ All ${saved} draft${saved !== 1 ? "s" : ""} saved successfully.`;
-
-    setBulkStatus(summary);
+      : `✅ All ${saved} draft${saved !== 1 ? "s" : ""} saved successfully.`);
     setBulkWorking(false);
-
-    // Close modal only after ALL drafts are done (no failures)
-    if (failed === 0 && typeof onClose === "function") {
-      setTimeout(onClose, 1200);
-    }
+    if (failed === 0 && typeof onClose === "function") setTimeout(onClose, 1200);
   }, [onNewSummary, onClose]);
 
-  /* ──────────────────────────────────────────────────────
-     handlePublishAll
-     Same fix: reads fresh data, closes modal only when done.
-  ────────────────────────────────────────────────────── */
   const handlePublishAll = useCallback(async () => {
     const publishable = articlesRef.current.filter(
       a => a.category !== DRAFT_SENTINEL && ["idle", "saved", "error"].includes(a._status)
     );
     if (!publishable.length) { setBulkStatus("No articles have a category selected."); return; }
     if (!window.confirm(`Publish all ${publishable.length} articles now?`)) return;
-
     setBulkWorking(true);
     setBulkStatus(`Publishing ${publishable.length} article${publishable.length > 1 ? "s" : ""}…`);
-
-    let published = 0;
-    let failed = 0;
-
+    let published = 0; let failed = 0;
     for (const snapArt of publishable) {
       const art = articlesRef.current.find(a => a._id === snapArt._id) || snapArt;
-
       setArticles(prev => prev.map(a => a._id === art._id ? { ...a, _status: "saving" } : a));
-
       const result = await publishCore(art);
-
       if (result.ok) {
         setArticles(prev => prev.map(a =>
           a._id === art._id ? { ...a, _status: "published", _draftId: result.draftId } : a
@@ -757,26 +728,16 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
         ));
         failed++;
       }
-
       setBulkStatus(`Published ${published} / ${publishable.length}…`);
     }
-
     if (typeof onNewSummary === "function") onNewSummary();
-
-    const summary = failed > 0
+    setBulkStatus(failed > 0
       ? `🚀 ${published} published — ⚠️ ${failed} failed (check errors above)`
-      : `🚀 All ${published} article${published !== 1 ? "s" : ""} published successfully.`;
-
-    setBulkStatus(summary);
+      : `🚀 All ${published} article${published !== 1 ? "s" : ""} published successfully.`);
     setBulkWorking(false);
-
-    // Close modal only after ALL published with no failures
-    if (failed === 0 && typeof onClose === "function") {
-      setTimeout(onClose, 1200);
-    }
+    if (failed === 0 && typeof onClose === "function") setTimeout(onClose, 1200);
   }, [onNewSummary, onClose]);
 
-  /* ── Delete All ── */
   const handleDeleteAll = useCallback(async () => {
     if (!articlesRef.current.length) return;
     if (!window.confirm(`Delete ALL ${articlesRef.current.length} articles? This cannot be undone.`)) return;
@@ -791,13 +752,13 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
     setBulkWorking(false);
   }, [onDelete]);
 
-  /* ── Counts ── */
   const counts = {
     total:     articles.length,
     idle:      articles.filter(a => a._status === "idle").length,
     saved:     articles.filter(a => a._status === "saved").length,
     published: articles.filter(a => a._status === "published").length,
     error:     articles.filter(a => a._status === "error").length,
+    withImage: articles.filter(a => a.imageUrl).length,
   };
 
   return (
@@ -814,8 +775,8 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
                 Each article must start with{" "}
                 <code style={{ background: "#e5e7eb", padding: "1px 5px", borderRadius: 4, fontFamily: "monospace", fontSize: 11 }}>ARTICLE 1</code>,{" "}
                 <code style={{ background: "#e5e7eb", padding: "1px 5px", borderRadius: 4, fontFamily: "monospace", fontSize: 11 }}>ARTICLE 2</code>, etc.<br />
-                The parser will extract <strong>SEO Title</strong>, <strong>Meta Description</strong>, and <strong>Tags</strong> into their fields.
-                {" "}<strong>Cover Image Prompt</strong> is discarded. All body content — subheadings, links, Related Articles, Affiliate Disclosure — is preserved exactly as written.
+                The parser extracts <strong>SEO Title</strong>, <strong>Meta Description</strong>, <strong>Tags</strong>, and <strong>Cover Image URL</strong> into their fields automatically.
+                All body content — subheadings, links, Related Articles, Affiliate Disclosure — is preserved exactly as written.
               </div>
             </div>
           </div>
@@ -824,7 +785,7 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
             style={{ width: "100%", minHeight: 280, fontFamily: "monospace", fontSize: 12, color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, padding: "12px 14px", background: "#fff", resize: "vertical", boxSizing: "border-box", lineHeight: 1.6 }}
             value={rawText}
             onChange={e => setRawText(e.target.value)}
-            placeholder={"ARTICLE 1\nSEO Title: Breville BOV900BSS: Does It Actually Deliver?\nCover Image Prompt: A Breville BOV900BSS on a counter…\nMeta Description: Wondering if the Breville lives up to the hype?\nTags: air fryer oven, breville, crispy meals\n\n## Does It Actually Crisp?\n\nIf you've been chasing that restaurant-level crispiness…\n\nARTICLE 2\n…"}
+            placeholder={"ARTICLE 1\nSEO Title: Breville BOV900BSS: Does It Actually Deliver?\nCover Image URL: https://example.com/images/breville-bov900bss.jpg\nMeta Description: Wondering if the Breville lives up to the hype?\nTags: air fryer oven, breville, crispy meals\n\n## Does It Actually Crisp?\n\nIf you've been chasing that restaurant-level crispiness…\n\nARTICLE 2\n…"}
             spellCheck={false}
           />
 
@@ -846,7 +807,6 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
       {/* ═══ PARSED ARTICLES ═══ */}
       {articles.length > 0 && (
         <>
-          {/* Top bar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "#f3f4f6", borderRadius: 8, border: "1px solid #e5e7eb", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>{counts.total} Articles</span>
@@ -854,6 +814,7 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
               {counts.saved > 0     && <Pill bg="#dcfce7" color="#166534" border="#86efac">✅ {counts.saved} saved</Pill>}
               {counts.published > 0 && <Pill bg="#dbeafe" color="#1e40af" border="#93c5fd">🚀 {counts.published} published</Pill>}
               {counts.error > 0     && <Pill bg="#fee2e2" color="#991b1b" border="#fca5a5">❌ {counts.error} errors</Pill>}
+              {counts.withImage > 0 && <Pill bg="#e0f2fe" color="#0369a1" border="#7dd3fc">🖼 {counts.withImage} with image</Pill>}
             </div>
             <button
               style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, color: "#6b7280", border: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", fontFamily: "inherit" }}
@@ -882,7 +843,6 @@ const BulkArticleEditor = ({ onNewSummary, onClose }) => {
             ))}
           </div>
 
-          {/* Bulk footer */}
           <div ref={bottomRef} style={{ marginTop: 28, padding: 20, background: "#f9fafb", border: "1.5px solid #e5e7eb", borderRadius: 10 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#374151", marginBottom: 6 }}>Bulk Actions</div>
             <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
